@@ -1,5 +1,0 @@
-ligtr=cache/lig_train1.molcache2, rectr=cache/rec_train1.molcache2
-Traceback (most recent call last):
-  File "DDG_model.py", line 148, in <module>
-    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr,recmolcache=args.rectr, balanced=True,shuffle=True)
-RuntimeError: failed mapping file: Invalid argument: iostream error

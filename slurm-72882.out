@@ -1,41 +1,0 @@
-mkdir: cannot create directory ‘/scr/drew/’: File exists
-rsync: link_stat "/net/mahler/home/mscbio/anm329/deltadeltaG/DDG_model.py" failed: No such file or directory (2)
-rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1196) [sender=3.1.2]
-Running on n078.dcb.private.net
-PATH=/net/pulsar/home/koes/dkoes/local/bin:/net/mahler/home/mscbio/anm329/bin:/opt/slurm/slurm-19.05.1-2/bin:/opt/slurm/slurm-19.05.1-2/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
-LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/local/cuda-10.1/lib64:/net/pulsar/home/koes/dkoes/local/lib:/net/antonin/usr/local/cuda-10.0/lib64:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/cuda-10.0/lib64:/lib:
-PYTHONPATH=/net/pulsar/home/koes/dkoes/local/lib/python3.6/site-packages/:
-SCRDIR=/scr/drew
-
-
-
-wandb: Tracking run with wandb version 0.8.13
-wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Run data is saved locally in wandb/run-20200121_220043-3dsayzcr
-wandb: Syncing run treasured-blaze-72
-wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
-wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/3dsayzcr
-wandb: Run `wandb off` to turn off syncing.
-
-DDG_reg.py:62: UserWarning: Using a target size (torch.Size([42])) that is different to the input size (torch.Size([42, 1])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  loss = F.mse_loss(output,labels)
-DDG_reg.py:85: UserWarning: Using a target size (torch.Size([42])) that is different to the input size (torch.Size([42, 1])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  loss = F.mse_loss(output,labels)
-Traceback (most recent call last):
-  File "DDG_reg.py", line 134, in <module>
-    tt_loss, tt_r2 = test(config, model, teste)
-  File "DDG_reg.py", line 87, in test
-    tot_r2 += calc_R2(output, label)
-UnboundLocalError: local variable 'tot_r2' referenced before assignment
-
-wandb: Waiting for W&B process to finish, PID 3081
-wandb: Program failed with code 1. Press ctrl-c to abort syncing.
-wandb: Run summary:
-wandb:                  _runtime 196.62171506881714
-wandb:                _timestamp 1579644238.6674428
-wandb:                     _step 0
-wandb: Syncing 7 W&B file(s) and 0 media file(s)
-wandb: - 0.02MB of 0.02MB uploadedwandb: \ 0.02MB of 0.02MB uploadedwandb: | 0.02MB of 0.02MB uploadedwandb: / 0.02MB of 0.02MB uploadedwandb: - 0.02MB of 0.02MB uploadedwandb: \ 0.02MB of 0.02MB uploadedwandb:                                                                                
-wandb: Synced treasured-blaze-72: https://app.wandb.ai/andmcnutt/DDG_model/runs/3dsayzcr
-/var/lib/slurm-llnl/slurmd/job72882/slurm_script: line 32: cmd: command not found

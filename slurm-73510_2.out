@@ -1,37 +1,0 @@
-mkdir: cannot create directory ‘/scr/drew/’: File exists
-Running on n117.dcb.private.net
-PATH=/net/pulsar/home/koes/dkoes/local/bin:/net/mahler/home/mscbio/anm329/bin:/opt/slurm/slurm-19.05.1-2/bin:/opt/slurm/slurm-19.05.1-2/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
-LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/local/cuda-10.1/lib64:/net/pulsar/home/koes/dkoes/local/lib:/net/antonin/usr/local/cuda-10.0/lib64:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/cuda-10.0/lib64:/lib:
-PYTHONPATH=/net/pulsar/home/koes/dkoes/local/lib/python3.6/site-packages/:
-SCRDIR=/scr/drew
-
-
-
-wandb: Tracking run with wandb version 0.8.13
-wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Run data is saved locally in wandb/run-20200122_162149-g5lqxylm
-wandb: Syncing run hopeful-spaceship-86
-wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
-wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/g5lqxylm
-wandb: Run `wandb off` to turn off syncing.
-
-
-wandb: Waiting for W&B process to finish, PID 3622
-wandb: Program ended successfully.
-wandb: Run summary:
-wandb:                _timestamp 1579725964.894814
-wandb:                  Test R^2 -0.0002503999850485455
-wandb:                  _runtime 15855.890116930008
-wandb:                 Test RMSD 0.031219333173202773
-wandb:                     _step 99
-wandb:             Avg Test Loss 0.04163835197687149
-wandb:                Train RMSD 0.030080503096871117
-wandb:            Avg Train Loss 0.03881445527076721
-wandb:                 Train R^2 -0.0002960080505058437
-wandb: Syncing files in wandb/run-20200122_162149-g5lqxylm:
-wandb:   model_reg.h5
-wandb: plus 7 W&B file(s) and 0 media file(s)
-wandb: - 1.31MB of 1.31MB uploadedwandb: \ 1.31MB of 1.31MB uploadedwandb: | 1.31MB of 1.31MB uploadedwandb: / 1.31MB of 1.31MB uploadedwandb: - 1.31MB of 1.31MB uploadedwandb: \ 1.31MB of 1.31MB uploadedwandb:                                                                                
-wandb: Synced hopeful-spaceship-86: https://app.wandb.ai/andmcnutt/DDG_model/runs/g5lqxylm
-/var/lib/slurm-llnl/slurmd/job73512/slurm_script: line 32: cmd: command not found

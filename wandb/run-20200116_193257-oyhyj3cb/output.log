@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "DDG_model.py", line 147, in <module>
-    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr,recmolcache=args.rectr, balanced=True,shuffle=True)
-MemoryError
