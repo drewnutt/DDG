@@ -12,6 +12,11 @@ export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/lo
 
 module load cuda/10.2
 
+if ((${SLURM_ARRAY_TASK_ID}==0))
+then
+	sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} calculate_gnina_DDG.slurm $1
+fi
+
 ((start=${SLURM_ARRAY_TASK_ID}*8+1))
 ((fin=${SLURM_ARRAY_TASK_ID}*8+8))
 cmd=`sed -n "${start},${fin}p" GNINA_RUN/run_gnina_$1.txt`
