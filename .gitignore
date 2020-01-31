@@ -1,0 +1,7 @@
+#directories
+wandb/**
+cache/**
+separated_sets/**
+
+#files
+slurm-*.out
