@@ -13,7 +13,7 @@ do
 	grep 'separated_sets\|Affinity\|CNN\|Intramolecular' $file >> RUN_GNINA/all_output_$1.txt
 done
 
-((lines=grep -c all_output_$1.txt))
+lines=$(grep -c 'Affinity' all_output_$1.txt)
 if ((lines==7704*5))
 then
 	rm slurm-${SLURM_JOB_DEPENDENCY//![0-9]/}_*.out

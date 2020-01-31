@@ -12,4 +12,4 @@ model=${models[0]}
 echo ${model}
 python3 GNINA_RUN/make_gnina_file.py -f separated_sets/training_input.txt --model ${model} >> GNINA_RUN/run_gnina_${model}.txt
 
-sbatch  --array=0-962 GNINA_RUN/gnina_comparison.slurm ${model}
+sbatch  --array=0-962 GNINA_RUN/run_gnina.slurm ${model}
