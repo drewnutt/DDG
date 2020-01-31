@@ -1,0 +1,5 @@
+ligtr=/scr/drew/lig_train1.molcache2, rectr=/scr/drew/rec_train1.molcache2
+Traceback (most recent call last):
+  File "DDG_reg.py", line 136, in <module>
+    "Train R^2": tr_r2.cpu(),
+AttributeError: 'float' object has no attribute 'cpu'

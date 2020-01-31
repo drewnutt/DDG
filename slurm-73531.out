@@ -1,0 +1,2 @@
+/var/lib/slurm-llnl/slurmd/job73531/slurm_script: line 11: syntax error near unexpected token `cp'
+/var/lib/slurm-llnl/slurmd/job73531/slurm_script: line 11: `	cp run_gnina.txt ${SLURM_SUBMIT_DIR}'

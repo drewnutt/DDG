@@ -1,0 +1,37 @@
+mkdir: cannot create directory ‘/scr/drew/’: File exists
+rsync: link_stat "/net/mahler/home/mscbio/anm329/deltadeltaG/DDG_model.py" failed: No such file or directory (2)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1196) [sender=3.1.2]
+Running on n078.dcb.private.net
+PATH=/net/pulsar/home/koes/dkoes/local/bin:/net/mahler/home/mscbio/anm329/bin:/opt/slurm/slurm-19.05.1-2/bin:/opt/slurm/slurm-19.05.1-2/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/local/cuda-10.1/lib64:/net/pulsar/home/koes/dkoes/local/lib:/net/antonin/usr/local/cuda-10.0/lib64:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/cuda-10.0/lib64:/lib:
+PYTHONPATH=/net/pulsar/home/koes/dkoes/local/lib/python3.6/site-packages/:
+SCRDIR=/scr/drew
+
+
+
+wandb: Tracking run with wandb version 0.8.13
+wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Run data is saved locally in wandb/run-20200121_223011-6l7vlvjg
+wandb: Syncing run classic-silence-82
+wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
+wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/6l7vlvjg
+wandb: Run `wandb off` to turn off syncing.
+
+
+wandb: Waiting for W&B process to finish, PID 4825
+wandb: Program ended successfully.
+wandb: Run summary:
+wandb:                _timestamp 1579667862.9706733
+wandb:             Avg Test Loss 0.04592222720384598
+wandb:            Avg Train Loss 0.025601563975214958
+wandb:                     _step 99
+wandb:                  _runtime 22053.087830543518
+wandb:                 Train R^2 0.007383771240711212
+wandb:                  Test R^2 -0.003254484850913286
+wandb: Syncing files in wandb/run-20200121_223011-6l7vlvjg:
+wandb:   model_reg.h5
+wandb: plus 7 W&B file(s) and 0 media file(s)
+wandb: - 1.32MB of 1.32MB uploadedwandb: \ 1.32MB of 1.32MB uploadedwandb: | 1.32MB of 1.32MB uploadedwandb: / 1.32MB of 1.32MB uploadedwandb: - 1.32MB of 1.32MB uploadedwandb: \ 1.32MB of 1.32MB uploadedwandb:                                                                                
+wandb: Synced classic-silence-82: https://app.wandb.ai/andmcnutt/DDG_model/runs/6l7vlvjg
+/var/lib/slurm-llnl/slurmd/job72895/slurm_script: line 32: cmd: command not found

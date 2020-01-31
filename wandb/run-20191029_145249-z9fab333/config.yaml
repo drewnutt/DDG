@@ -1,0 +1,17 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.8.13
+    is_jupyter_run: false
+    python_version: 3.6.8
+batch_size:
+  desc: null
+  value: 50
+lr:
+  desc: null
+  value: 0.01
+momentum:
+  desc: null
+  value: 0.9

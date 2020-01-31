@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "DDG_model.py", line 169, in <module>
+    tt_loss, tt_acc, tt_pr, tt_rec, auc = test(config, model, teste)
+  File "DDG_model.py", line 126, in test
+    tot_auc += get_AUC(output, labels)
+  File "DDG_model.py", line 53, in get_AUC
+    ind = torch.ones((1,), dtype=torch.cuda.ByteTensor)
+TypeError: ones() received an invalid combination of arguments - got (tuple, dtype=torch.tensortype), but expected one of:
+ * (tuple of ints size, tuple of names names, torch.dtype dtype, torch.layout layout, torch.device device, bool pin_memory, bool requires_grad)
+ * (tuple of ints size, Tensor out, torch.dtype dtype, torch.layout layout, torch.device device, bool pin_memory, bool requires_grad)
+

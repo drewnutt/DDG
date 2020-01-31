@@ -1,0 +1,37 @@
+mkdir: cannot create directory ‘/scr/drew/’: File exists
+Running on n117.dcb.private.net
+PATH=/net/pulsar/home/koes/dkoes/local/bin:/net/mahler/home/mscbio/anm329/bin:/opt/slurm/slurm-19.05.1-2/bin:/opt/slurm/slurm-19.05.1-2/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/local/cuda-10.1/lib64:/net/pulsar/home/koes/dkoes/local/lib:/net/antonin/usr/local/cuda-10.0/lib64:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/cuda-10.0/lib64:/lib:
+PYTHONPATH=/net/pulsar/home/koes/dkoes/local/lib/python3.6/site-packages/:
+SCRDIR=/scr/drew
+
+
+
+wandb: Tracking run with wandb version 0.8.13
+wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Run data is saved locally in wandb/run-20200122_162149-nwdey2cr
+wandb: Syncing run upbeat-frog-86
+wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
+wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/nwdey2cr
+wandb: Run `wandb off` to turn off syncing.
+
+
+wandb: Waiting for W&B process to finish, PID 3621
+wandb: Program ended successfully.
+wandb: Run summary:
+wandb:                  _runtime 15685.878033161163
+wandb:                Train RMSD 0.024214458552653327
+wandb:            Avg Train Loss 0.02509102039039135
+wandb:                _timestamp 1579725794.882784
+wandb:                 Test RMSD 0.03279871046767367
+wandb:                     _step 99
+wandb:             Avg Test Loss 0.04599974304437637
+wandb:                 Train R^2 0.007666119805031175
+wandb:                  Test R^2 -0.00337099622854023
+wandb: Syncing files in wandb/run-20200122_162149-nwdey2cr:
+wandb:   model_reg.h5
+wandb: plus 7 W&B file(s) and 0 media file(s)
+wandb: - 0.92MB of 1.32MB uploadedwandb: \ 1.32MB of 1.32MB uploadedwandb: | 1.32MB of 1.32MB uploadedwandb: / 1.32MB of 1.32MB uploadedwandb: - 1.32MB of 1.32MB uploadedwandb: \ 1.32MB of 1.32MB uploadedwandb: | 1.32MB of 1.32MB uploadedwandb:                                                                                
+wandb: Synced upbeat-frog-86: https://app.wandb.ai/andmcnutt/DDG_model/runs/nwdey2cr
+/var/lib/slurm-llnl/slurmd/job73511/slurm_script: line 32: cmd: command not found

@@ -1,0 +1,195 @@
+{
+    "graph_0": {
+        "_type": "graph",
+        "format": "torch",
+        "nodes": [
+            {
+                "name": "pool0",
+                "id": 139792110667928,
+                "class_name": "MaxPool3d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)",
+                "parameters": [],
+                "output_shape": [
+                    [
+                        42,
+                        42,
+                        24,
+                        24,
+                        24
+                    ]
+                ],
+                "num_parameters": []
+            },
+            {
+                "name": "conv1",
+                "id": 139790382668824,
+                "class_name": "Conv3d(42, 32, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))",
+                "parameters": [
+                    [
+                        "weight",
+                        [
+                            32,
+                            42,
+                            3,
+                            3,
+                            3
+                        ]
+                    ],
+                    [
+                        "bias",
+                        [
+                            32
+                        ]
+                    ]
+                ],
+                "output_shape": [
+                    [
+                        42,
+                        32,
+                        24,
+                        24,
+                        24
+                    ]
+                ],
+                "num_parameters": [
+                    36288,
+                    32
+                ]
+            },
+            {
+                "name": "pool1",
+                "id": 139792110669720,
+                "class_name": "MaxPool3d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)",
+                "parameters": [],
+                "output_shape": [
+                    [
+                        42,
+                        32,
+                        12,
+                        12,
+                        12
+                    ]
+                ],
+                "num_parameters": []
+            },
+            {
+                "name": "conv2",
+                "id": 139790609546488,
+                "class_name": "Conv3d(32, 64, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))",
+                "parameters": [
+                    [
+                        "weight",
+                        [
+                            64,
+                            32,
+                            3,
+                            3,
+                            3
+                        ]
+                    ],
+                    [
+                        "bias",
+                        [
+                            64
+                        ]
+                    ]
+                ],
+                "output_shape": [
+                    [
+                        42,
+                        64,
+                        12,
+                        12,
+                        12
+                    ]
+                ],
+                "num_parameters": [
+                    55296,
+                    64
+                ]
+            },
+            {
+                "name": "pool2",
+                "id": 139791951083168,
+                "class_name": "MaxPool3d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)",
+                "parameters": [],
+                "output_shape": [
+                    [
+                        42,
+                        64,
+                        6,
+                        6,
+                        6
+                    ]
+                ],
+                "num_parameters": []
+            },
+            {
+                "name": "conv3",
+                "id": 139792086206224,
+                "class_name": "Conv3d(64, 128, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))",
+                "parameters": [
+                    [
+                        "weight",
+                        [
+                            128,
+                            64,
+                            3,
+                            3,
+                            3
+                        ]
+                    ],
+                    [
+                        "bias",
+                        [
+                            128
+                        ]
+                    ]
+                ],
+                "output_shape": [
+                    [
+                        42,
+                        128,
+                        6,
+                        6,
+                        6
+                    ]
+                ],
+                "num_parameters": [
+                    221184,
+                    128
+                ]
+            },
+            {
+                "name": "fc1",
+                "id": 139790609637448,
+                "class_name": "Linear(in_features=27648, out_features=1, bias=True)",
+                "parameters": [
+                    [
+                        "weight",
+                        [
+                            1,
+                            27648
+                        ]
+                    ],
+                    [
+                        "bias",
+                        [
+                            1
+                        ]
+                    ]
+                ],
+                "output_shape": [
+                    [
+                        42,
+                        1
+                    ]
+                ],
+                "num_parameters": [
+                    27648,
+                    1
+                ]
+            }
+        ],
+        "edges": []
+    }
+}

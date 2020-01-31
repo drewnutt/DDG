@@ -1,0 +1,19 @@
+mkdir: cannot create directory ‘/scr/drew/’: File exists
+Running on n117.dcb.private.net
+PATH=/net/pulsar/home/koes/dkoes/local/bin:/net/mahler/home/mscbio/anm329/bin:/opt/slurm/slurm-19.05.1-2/bin:/opt/slurm/slurm-19.05.1-2/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/local/cuda-10.1/lib64:/net/pulsar/home/koes/dkoes/local/lib:/net/antonin/usr/local/cuda-10.0/lib64:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/cuda-10.0/lib64:/lib:
+PYTHONPATH=/net/pulsar/home/koes/dkoes/local/lib/python3.6/site-packages/:
+SCRDIR=/scr/drew
+
+
+
+wandb: Tracking run with wandb version 0.8.13
+wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Run data is saved locally in wandb/run-20200122_161130-pg0gqfwl
+wandb: Syncing run northern-breeze-85
+wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
+wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/pg0gqfwl
+wandb: Run `wandb off` to turn off syncing.
+
+slurmstepd: error: *** JOB 73509 ON n117 CANCELLED AT 2020-01-22T11:20:15 ***

@@ -1,0 +1,16 @@
+mkdir: cannot create directory ‘/scr/drew/’: File exists
+rsync: link_stat "/net/mahler/home/mscbio/anm329/deltadeltaG/DDG_model.py" failed: No such file or directory (2)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1196) [sender=3.1.2]
+Running on n078.dcb.private.net
+PATH=/net/pulsar/home/koes/dkoes/local/bin:/net/mahler/home/mscbio/anm329/bin:/opt/slurm/slurm-19.05.1-2/bin:/opt/slurm/slurm-19.05.1-2/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/local/cuda-10.1/lib64:/net/pulsar/home/koes/dkoes/local/lib:/net/antonin/usr/local/cuda-10.0/lib64:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/cuda-10.0/lib64:/lib:
+PYTHONPATH=/net/pulsar/home/koes/dkoes/local/lib/python3.6/site-packages/:
+SCRDIR=/scr/drew
+
+
+
+  File "DDG_reg.py", line 131
+    tr_loss.cpu(), tr_r2.cpu() =  train(config, model, traine, optimizer, epoch)
+    ^
+SyntaxError: can't assign to function call
+/var/lib/slurm-llnl/slurmd/job72893/slurm_script: line 32: cmd: command not found

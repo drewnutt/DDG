@@ -1,0 +1,44 @@
+ligtr=/scr/drew/lig_train1.molcache2, rectr=/scr/drew/rec_train1.molcache2
+DDG_reg.py:62: UserWarning: Using a target size (torch.Size([42])) that is different to the input size (torch.Size([42, 1])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  loss = F.mse_loss(output,labels)
+DDG_reg.py:83: UserWarning: Using a target size (torch.Size([42])) that is different to the input size (torch.Size([42, 1])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  loss = F.mse_loss(output,labels)
+Traceback (most recent call last):
+  File "DDG_reg.py", line 137, in <module>
+    "Test R^2": tt_r2})
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/__init__.py", line 667, in log
+    run.history.add(row, *args, step=step, **kwargs)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/history.py", line 126, in add
+    self._write()
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/history.py", line 225, in _write
+    self._file.write(util.json_dumps_safer_history(self.row))
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/util.py", line 449, in json_dumps_safer_history
+    return json.dumps(obj, cls=WandBHistoryJSONEncoder, **kwargs)
+  File "/usr/lib/python3.6/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+  File "/usr/lib/python3.6/json/encoder.py", line 199, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/usr/lib/python3.6/json/encoder.py", line 257, in iterencode
+    return _iterencode(o, 0)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/util.py", line 435, in default
+    obj, converted = json_friendly(obj)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/util.py", line 295, in json_friendly
+    obj = obj.numpy()
+TypeError: can't convert CUDA tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
+Error in atexit._run_exitfuncs:
+Traceback (most recent call last):
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/history.py", line 225, in _write
+    self._file.write(util.json_dumps_safer_history(self.row))
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/util.py", line 449, in json_dumps_safer_history
+    return json.dumps(obj, cls=WandBHistoryJSONEncoder, **kwargs)
+  File "/usr/lib/python3.6/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+  File "/usr/lib/python3.6/json/encoder.py", line 199, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/usr/lib/python3.6/json/encoder.py", line 257, in iterencode
+    return _iterencode(o, 0)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/util.py", line 435, in default
+    obj, converted = json_friendly(obj)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/wandb/util.py", line 295, in json_friendly
+    obj = obj.numpy()
+TypeError: can't convert CUDA tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.

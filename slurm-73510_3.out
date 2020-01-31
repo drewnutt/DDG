@@ -1,0 +1,37 @@
+mkdir: cannot create directory ‘/scr/drew/’: File exists
+Running on n117.dcb.private.net
+PATH=/net/pulsar/home/koes/dkoes/local/bin:/net/mahler/home/mscbio/anm329/bin:/opt/slurm/slurm-19.05.1-2/bin:/opt/slurm/slurm-19.05.1-2/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/local/cuda-10.1/lib64:/net/pulsar/home/koes/dkoes/local/lib:/net/antonin/usr/local/cuda-10.0/lib64:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/cuda-10.0/lib64:/lib:
+PYTHONPATH=/net/pulsar/home/koes/dkoes/local/lib/python3.6/site-packages/:
+SCRDIR=/scr/drew
+
+
+
+wandb: Tracking run with wandb version 0.8.13
+wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Run data is saved locally in wandb/run-20200122_162149-m7q2hkzl
+wandb: Syncing run tough-wave-86
+wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
+wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/m7q2hkzl
+wandb: Run `wandb off` to turn off syncing.
+
+
+wandb: Waiting for W&B process to finish, PID 3624
+wandb: Program ended successfully.
+wandb: Run summary:
+wandb:                 Test RMSD 0.03121940084110085
+wandb:                 Train R^2 -0.0002973072943261438
+wandb:                  Test R^2 -0.0002505094264243128
+wandb:                  _runtime 16628.383479833603
+wandb:                     _step 99
+wandb:             Avg Test Loss 0.041638508439064026
+wandb:                Train RMSD 0.030081217383791985
+wandb:            Avg Train Loss 0.038816049695014954
+wandb:                _timestamp 1579726737.3890202
+wandb: Syncing files in wandb/run-20200122_162149-m7q2hkzl:
+wandb:   model_reg.h5
+wandb: plus 7 W&B file(s) and 0 media file(s)
+wandb: - 1.31MB of 1.31MB uploadedwandb: \ 1.31MB of 1.31MB uploadedwandb: | 1.31MB of 1.31MB uploadedwandb: / 1.31MB of 1.31MB uploadedwandb: - 1.31MB of 1.31MB uploadedwandb: \ 1.31MB of 1.31MB uploadedwandb: | 1.31MB of 1.31MB uploadedwandb:                                                                                
+wandb: Synced tough-wave-86: https://app.wandb.ai/andmcnutt/DDG_model/runs/m7q2hkzl
+/var/lib/slurm-llnl/slurmd/job73513/slurm_script: line 32: cmd: command not found

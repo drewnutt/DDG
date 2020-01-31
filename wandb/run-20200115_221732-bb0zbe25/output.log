@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "DDG_model.py", line 167, in <module>
+    tt_loss, tt_acc, tt_pr, tt_rec, auc = test(config, model, teste)
+  File "DDG_model.py", line 124, in test
+    tot_auc += get_AUC(output, labels)
+  File "DDG_model.py", line 73, in get_AUC
+    return roc_auc_score(label.cpu().numpy(),pred.cpu().numpy())
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/sklearn/metrics/_ranking.py", line 390, in roc_auc_score
+    sample_weight=sample_weight)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/sklearn/metrics/_base.py", line 77, in _average_binary_score
+    return binary_metric(y_true, y_score, sample_weight=sample_weight)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/sklearn/metrics/_ranking.py", line 225, in _binary_roc_auc_score
+    sample_weight=sample_weight)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/sklearn/metrics/_ranking.py", line 771, in roc_curve
+    y_true, y_score, pos_label=pos_label, sample_weight=sample_weight)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/sklearn/metrics/_ranking.py", line 540, in _binary_clf_curve
+    y_score = column_or_1d(y_score)
+  File "/net/mahler/home/mscbio/anm329/.local/lib/python3.6/site-packages/sklearn/utils/validation.py", line 797, in column_or_1d
+    raise ValueError("bad input shape {0}".format(shape))
+ValueError: bad input shape (42, 2)

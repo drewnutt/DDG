@@ -1,0 +1,78 @@
+wandb: Tracking run with wandb version 0.8.13
+wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Run data is saved locally in wandb/run-20200116_163949-utkeny8q
+wandb: Syncing run chocolate-dust-35
+wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
+wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/utkeny8q
+wandb: Run `wandb off` to turn off syncing.
+
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [0,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [2,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [4,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [6,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [8,0,0] Assertion `t >= 0 && t < n_classes` failed.
+Traceback (most recent call last):
+  File "DDG_model.py", line 166, in <module>
+    tr_loss, tr_acc =  train(config, model, traine, optimizer, epoch)
+  File "DDG_model.py", line 97, in train
+    correct += (pred_label == labels).sum().item()
+RuntimeError: CUDA error: device-side assert triggered
+
+wandb: Waiting for W&B process to finish, PID 7893
+wandb: Program failed with code 1. Press ctrl-c to abort syncing.
+wandb: Process crashed early, not syncing files
+double free or corruption (!prev)
+/var/lib/slurm-llnl/slurmd/job54771/slurm_script: line 19:  7878 Aborted                 python3 DDG_model.py --ligtr cache/lig_train1.molcache2 --rectr cache/rec_train1.molcache2 --trainfile CV_Sets/train_1.txt --ligte cache/lig_test1.molcache2 --recte cache/rec_test1.molcache2 --testfile CV_Sets/test_1.txt -wd $weight
+wandb: Tracking run with wandb version 0.8.13
+wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Run data is saved locally in wandb/run-20200116_164000-file6gzw
+wandb: Syncing run morning-smoke-36
+wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
+wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/file6gzw
+wandb: Run `wandb off` to turn off syncing.
+
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [0,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [2,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [4,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [6,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [8,0,0] Assertion `t >= 0 && t < n_classes` failed.
+
+wandb: Waiting for W&B process to finish, PID 7943
+Traceback (most recent call last):
+  File "DDG_model.py", line 166, in <module>
+    tr_loss, tr_acc =  train(config, model, traine, optimizer, epoch)
+  File "DDG_model.py", line 97, in train
+    correct += (pred_label == labels).sum().item()
+RuntimeError: CUDA error: device-side assert triggered
+wandb: Program failed with code 1. Press ctrl-c to abort syncing.
+wandb: Process crashed early, not syncing files
+double free or corruption (!prev)
+/var/lib/slurm-llnl/slurmd/job54771/slurm_script: line 19:  7935 Aborted                 python3 DDG_model.py --ligtr cache/lig_train1.molcache2 --rectr cache/rec_train1.molcache2 --trainfile CV_Sets/train_1.txt --ligte cache/lig_test1.molcache2 --recte cache/rec_test1.molcache2 --testfile CV_Sets/test_1.txt -wd $weight
+wandb: Tracking run with wandb version 0.8.13
+wandb: Wandb version 0.8.21 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Run data is saved locally in wandb/run-20200116_164012-bc0x04vs
+wandb: Syncing run noble-flower-37
+wandb: ⭐️ View project at https://app.wandb.ai/andmcnutt/DDG_model
+wandb: 🚀 View run at https://app.wandb.ai/andmcnutt/DDG_model/runs/bc0x04vs
+wandb: Run `wandb off` to turn off syncing.
+
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [0,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [2,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [4,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [6,0,0] Assertion `t >= 0 && t < n_classes` failed.
+/pytorch/aten/src/THCUNN/ClassNLLCriterion.cu:106: void cunn_ClassNLLCriterion_updateOutput_kernel(Dtype *, Dtype *, Dtype *, long *, Dtype *, int, int, int, int, long) [with Dtype = float, Acctype = float]: block: [0,0,0], thread: [8,0,0] Assertion `t >= 0 && t < n_classes` failed.
+
+wandb: Waiting for W&B process to finish, PID 8002
+Traceback (most recent call last):
+  File "DDG_model.py", line 166, in <module>
+    tr_loss, tr_acc =  train(config, model, traine, optimizer, epoch)
+  File "DDG_model.py", line 97, in train
+    correct += (pred_label == labels).sum().item()
+RuntimeError: CUDA error: device-side assert triggered
+wandb: Program failed with code 1. Press ctrl-c to abort syncing.
+wandb: Process crashed early, not syncing files
+double free or corruption (!prev)
+/var/lib/slurm-llnl/slurmd/job54771/slurm_script: line 19:  7978 Aborted                 python3 DDG_model.py --ligtr cache/lig_train1.molcache2 --rectr cache/rec_train1.molcache2 --trainfile CV_Sets/train_1.txt --ligte cache/lig_test1.molcache2 --recte cache/rec_test1.molcache2 --testfile CV_Sets/test_1.txt -wd $weight

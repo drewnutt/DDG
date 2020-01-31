@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "DDG_model.py", line 167, in <module>
+    tt_loss, tt_acc, tt_pr, tt_rec, auc = test(config, model, teste)
+  File "DDG_model.py", line 124, in test
+    tot_auc += get_AUC(pos_score, labels)
+  File "DDG_model.py", line 55, in get_AUC
+    indexes = list(range(len(pred)))
+NameError: name 'pred' is not defined

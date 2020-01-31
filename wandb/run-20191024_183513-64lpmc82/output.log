@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "DDG_model.py", line 85, in <module>
+    e.populate(args.trainfile)
+ValueError: Missing molecular data in line: 1 inf 1Y6Q/1Y6Q_R_0.gninatypes 1Y6Q/1Y6Q00_0.gninatypes 1Y6Q/1Y6Q07_0.gninatypes

@@ -1,0 +1,5 @@
+ligtr=lig_train1.molcache2, rectr=rec_train1.molcache2
+Traceback (most recent call last):
+  File "DDG_model.py", line 151, in <module>
+    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr,recmolcache=args.rectr, balanced=True,shuffle=True)
+ValueError: Could not open file: rec_train1.molcache2
