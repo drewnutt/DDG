@@ -3,6 +3,8 @@ wandb/**
 cache/**
 separated_sets/**
 !separated_sets/*
+separated_sets/.*
+*.swp
 
 #files
 slurm-*.out
