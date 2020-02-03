@@ -26,3 +26,9 @@ do
 	eval $line
 done <<< $cmd
 
+count=$(grep -c 'Affinity' slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.out)
+if ((count!=8))
+then
+	echo slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.out >> problem_file.txt
+fi
+

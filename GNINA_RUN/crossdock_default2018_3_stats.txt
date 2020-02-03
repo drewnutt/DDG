@@ -1,0 +1,5 @@
+crossdock_default2018_3:
+Metric | Accuracy
+-----|-----
+GNINA Affinity | 0.42562349244285114
+GNINA Score | 0.4835358162384651

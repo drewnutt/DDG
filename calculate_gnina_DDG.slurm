@@ -8,7 +8,7 @@
 #SBATCH --constraint=C5
 
 echo $1
-num=89598
+num=102220
 for file in $(ls slurm-${num}_*.out)
 do
 	grep 'separated_sets\|Affinity\|CNNa\|CNNs\|Intramolecular' $file >> GNINA_RUN/all_output_$1.txt

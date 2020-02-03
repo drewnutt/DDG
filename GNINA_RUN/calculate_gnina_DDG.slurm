@@ -8,7 +8,7 @@
 #SBATCH --constraint=C5
 
 
-for file in $(ls slurm-${SLURM_JOB_DEPENDENCY//![0-9]/}_*.out)
+for file in $(ls slurm-${SLURM_JOB_DEPENDENCY//[!0-9]/}_*.out)
 do
 	grep 'separated_sets\|Affinity\|CNNa\|CNNs\|Intramolecular' $file >> GNINA_RUN/all_output_$1.txt
 done
@@ -16,7 +16,7 @@ done
 lines=$(grep -c 'Affinity' GNINA_RUN/all_output_$1.txt)
 if (($lines==7704))
 then
-	rm slurm-${SLURM_JOB_DEPENDENCY//![0-9]/}_*.out
+	rm slurm-${SLURM_JOB_DEPENDENCY//[!0-9]/}_*.out
 fi
 
 python3 GNINA_RUN/calculate_gnina_DDG.py -gf GNINA_RUN/all_output_$1.txt --trainf separated_sets/training_input.txt --model $1
