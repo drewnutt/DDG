@@ -7,6 +7,9 @@
 #SBATCH --ntasks=1
 #SBATCH --constraint=C5
 
+((newm=++$2))
+echo $newm
+sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} ~/deltadeltaG/gninacomp_pipeline.slurm $newm
 
 for file in $(ls slurm-${SLURM_JOB_DEPENDENCY//[!0-9]/}_*.out)
 do

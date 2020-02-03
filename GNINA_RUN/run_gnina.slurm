@@ -14,7 +14,7 @@ module load cuda/10.2
 
 if ((${SLURM_ARRAY_TASK_ID}==0))
 then
-	sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} GNINA_RUN/calculate_gnina_DDG.slurm $1
+	sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} GNINA_RUN/calculate_gnina_DDG.slurm $1 $2
 fi
 
 ((start=${SLURM_ARRAY_TASK_ID}*8+1))
