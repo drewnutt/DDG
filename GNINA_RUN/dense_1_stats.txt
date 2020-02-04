@@ -1,0 +1,5 @@
+dense_1:
+Metric | Accuracy
+-----|-----
+GNINA Affinity | 0.44916904556418596
+GNINA Score | 0.48245148155524575

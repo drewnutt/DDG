@@ -7,7 +7,8 @@
 #SBATCH --ntasks=1
 #SBATCH --constraint=C5
 
-((newm=++$2))
+((newm=$2+1))
+echo $2
 echo $newm
 sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} ~/deltadeltaG/gninacomp_pipeline.slurm $newm
 
