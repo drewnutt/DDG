@@ -64,12 +64,12 @@ for i,r in enumerate(rec):
     lig_perms = permutations(ligs,2)
     for lig1,lig2 in lig_perms:
         try:
-            labelcaff = int((float(rec_affinity.at[lig1,'caff']) > float(rec_affinity.at[lig2,'caff'])) == True)
-            labelscr = int((float(rec_affinity.at[lig1,'score']) > float(rec_affinity.at[lig2,'score'])) == True)
-            labelv = int((float(rec_affinity.at[lig1,'aff']) > float(rec_affinity.at[lig2,'aff'])) == True)
-            diffcaff = float(rec_affinity.at[lig1,'caff']) - float(rec_affinity.at[lig2,'caff'])
-            diffscore = float(rec_affinity.at[lig1,'score']) - float(rec_affinity.at[lig2,'score'])
-            diffv = float(rec_affinity.at[lig1,'aff']) - float(rec_affinity.at[lig2,'aff'])
+            labelcaff = int(abs((float(rec_affinity.at[lig1,'caff'])) > abs(float(rec_affinity.at[lig2,'caff']))) == True)
+            labelscr = int(abs((float(rec_affinity.at[lig1,'score'])) > abs(float(rec_affinity.at[lig2,'score']))) == True)
+            labelv = int(abs((float(rec_affinity.at[lig1,'aff'])) > abs(float(rec_affinity.at[lig2,'aff']))) == True)
+            diffcaff = abs(float(rec_affinity.at[lig1,'caff'])) - abs(float(rec_affinity.at[lig2,'caff']))
+            diffscore = abs(float(rec_affinity.at[lig1,'score'])) - abs(float(rec_affinity.at[lig2,'score']))
+            diffv = abs(float(rec_affinity.at[lig1,'aff'])) - abs(float(rec_affinity.at[lig2,'aff']))
             info = [labelcaff, diffcaff, labelscr, diffscore, labelv, diffv, lig1,lig2]
             list_of_data.append(info)
         except:

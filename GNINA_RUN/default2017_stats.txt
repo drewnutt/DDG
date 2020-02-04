@@ -1,5 +1,5 @@
 default2017:
 Metric | Accuracy
 -----|-----
-GNINA Affinity | 0.4331474473876386
+GNINA Affinity | 0.43311425346876453
 GNINA Score | 0.4905950563190157

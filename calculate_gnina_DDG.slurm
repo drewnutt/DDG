@@ -21,4 +21,4 @@ then
 	rm slurm-${num}_*.out
 fi
 
-python3 GNINA_RUN/calculate_gnina_DDG.py -gf GNINA_RUN/all_output_$1.txt --trainf separated_sets/training_input.txt --model $1
+python3 GNINA_RUN/calculate_gnina_DDG.py -gf GNINA_RUN/better_all_output_$1.txt --trainf separated_sets/training_input.txt --model $1

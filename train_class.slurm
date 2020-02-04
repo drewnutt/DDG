@@ -25,9 +25,10 @@ echo PYTHONPATH=$PYTHONPATH
 echo SCRDIR=$SCRDIR
 echo -e  '\n\n'
 
-#wd=(0 0.1 0.01 0.001)
-#cmd=`python3 DDG_class.py --ligtr cache/lig_train1.molcache2  --rectr cache/rec_train1.molcache2 --trainfile CV_Sets/train_1.txt --ligte cache/lig_test1.molcache2 --recte cache/rec_test1.molcache2 --testfile CV_Sets/test_1.txt -wd ${wd[${SLURM_ARRAY_TASK_ID}]}`
+wd=(0 0.1 0.01 0.001 0.0001 0.00001 0.000001)
+echo ${wd[${SLURM_ARRAY_TASK_ID}]}
+cmd=`python3 DDG_class.py --ligtr cache/lig_train1.molcache2  --rectr cache/rec_train1.molcache2 --trainfile CV_Sets/train_1.txt --ligte cache/lig_test1.molcache2 --recte cache/rec_test1.molcache2 --testfile CV_Sets/test_1.txt -wd ${wd[${SLURM_ARRAY_TASK_ID}]}`
 
-cmd=`python3 DDG_class.py --ligtr ${SCRDIR}/lig_train1.molcache2  --rectr ${SCRDIR}/rec_train1.molcache2 --trainfile ${SCRDIR}/train_1.txt --ligte ${SCRDIR}/lig_test1.molcache2 --recte ${SCRDIR}/rec_test1.molcache2 --testfile ${SCRDIR}/test_1.txt`
+#cmd=`python3 DDG_class.py --ligtr ${SCRDIR}/lig_train1.molcache2  --rectr ${SCRDIR}/rec_train1.molcache2 --trainfile ${SCRDIR}/train_1.txt --ligte ${SCRDIR}/lig_test1.molcache2 --recte ${SCRDIR}/rec_test1.molcache2 --testfile ${SCRDIR}/test_1.txt`
 eval cmd
 exit
