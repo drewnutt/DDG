@@ -8,6 +8,7 @@ from torch.nn import init
 import os
 import wandb
 import argparse
+from scipy.stats import pearsonr
 
 class Net(nn.Module):
     def __init__(self, dims):
@@ -37,25 +38,12 @@ def weights_init(m):
     if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
             init.xavier_uniform_(m.weight.data)
 
-def calc_R2(pred,actual):
-	a_mean = torch.mean(actual)
-	sst,ssr = 0.0,0.0
-	sst = actual.sub(a_mean)
-	ssr = actual.sub(pred)
-	t = (sst.pow(2)).sum().item()
-	r = (ssr.pow(2)).sum().item()
-
-	return 1-(r/t)
-
-def calc_RMSD(pred,actual):
-    diff = pred.sub(actual)
-    return torch.sqrt((diff.pow(2)).sum()/len(pred)).item()
-
 def train(args, model, traine, optimizer, epoch):
     model.train()
     train_loss = 0
-    r2,rmsd = 0.0,0.0
     total = 0
+    sum_squared_err = 0
+    predict, actual = [], []
     for _ in range(1708):
         batch = traine.next_batch(args.batch_size)
         gmaker.forward(batch, input_tensor,random_translation=2.0, random_rotation=True) 
@@ -64,19 +52,23 @@ def train(args, model, traine, optimizer, epoch):
         optimizer.zero_grad()
         output = model(input_tensor)
         loss = F.mse_loss(output,labels)
-        r2 += calc_R2(output,labels)
-        rmsd += calc_RMSD(output,labels)
-        total += config.batch_size
         train_loss += loss
         loss.backward()
         optimizer.step()
-    return train_loss/(args.batch_size*1708), (r2/total), (rmsd/total)
+        sum_squared_err += F.mse_loss(output,labels, reduction='sum')
+        total += config.batch_size
+        predict += output.flatten().tolist()
+        actual += labels.flatten().tolist()
+        
+    r = pearsonr(np.array(actual),np.array(predict))
+    return train_loss/(args.batch_size*1708), r[0], torch.sqrt(sum_squared_err/total).tolist()
 
 def test(args, model, teste):
     model.eval()
     test_loss = 0
-    tot_r2,rmsd = 0.0, 0.0
     total = 0
+    sum_squared_err = 0
+    predict, actual = [], []
 
     with torch.no_grad():
         for _ in range(443):	
@@ -87,10 +79,14 @@ def test(args, model, teste):
             output = model(input_tensor)
             loss = F.mse_loss(output,labels)
             test_loss += loss
+            sum_squared_err += F.mse_loss(output,labels, reduction='sum')
             total += args.batch_size
-            tot_r2 += calc_R2(output, labels)
-            rmsd += calc_RMSD(output,labels)
-    return test_loss/(443*args.batch_size), tot_r2/(total), rmsd/total
+            predict += output.flatten().tolist()
+            actual += labels.flatten().tolist()
+            
+        r = pearsonr(np.array(actual),np.array(predict))
+
+    return test_loss/(443*args.batch_size), r[0], torch.sqrt(sum_squared_err/total).tolist()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--ligtr', required=True, help='location of training ligand cache file input')
@@ -109,7 +105,7 @@ config.batch_size = 42
 config.lr = 0.01
 config.momentum = 0.9
 config.threshold=0.5
-config.epochs= 100
+config.epochs= 200
 config.weight_decay=args.weightdecay
 
 print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
@@ -124,7 +120,7 @@ teste.populate(args.testfile)
 gmaker = molgrid.GridMaker()
 dims = gmaker.grid_dimensions(42)
 tensor_shape = (config.batch_size,)+dims
-
+print('Dimensions: {}, num_types:{}'.format(dims, traine.num_types()))
 model = Net(dims).to('cuda')
 model.apply(weights_init)
 
@@ -135,15 +131,15 @@ float_labels = torch.zeros(config.batch_size, dtype=torch.float32)
 wandb.watch(model,log='all')
 
 for epoch in range(config.epochs):
-    tr_loss, tr_r2, tr_rmsd =  train(config, model, traine, optimizer, epoch)
-    tt_loss, tt_r2, tt_rmsd = test(config, model, teste)
+    tr_loss, tr_r, tr_rmse =  train(config, model, traine, optimizer, epoch)
+    tt_loss, tt_r, tt_rmse = test(config, model, teste)
     wandb.log({
             "Avg Train Loss": tr_loss,
-            "Train R^2": tr_r2,
-            "Train RMSD": tr_rmsd,
+            "Train R": tr_r,
+            "Train RMSE": tr_rmse,
             "Avg Test Loss": tt_loss,
-            "Test RMSD": tt_rmsd,
-            "Test R^2": tt_r2})
+            "Test RMSE": tt_rmse,
+            "Test R": tt_r})
 
 torch.save(model.state_dict(), "model_reg.h5")
 wandb.save('model_reg.h5')

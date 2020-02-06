@@ -1,13 +1,11 @@
 #!/bin/bash
-#SBATCH -J regression_model
+#SBATCH -J improved_model_wd
 #SBATCH -t 24:00:00
 #SBATCH -N 1
 #SBATCH -p dept_gpu
 #SBATCH --gres=gpu:2
 #SBATCH --ntasks=1
 #SBATCH --constraint=C5
-#SBATCH --mail-type=FAIL,TIME_LIMIT
-#SBATCH --mail-user=anm329@pitt.edu
 
 export PATH=/net/pulsar/home/koes/dkoes/local/bin:$PATH
 export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:/net/pulsar/home/koes/dkoes/local/cuda-10.1/lib64:/net/pulsar/home/koes/dkoes/local/lib:/net/antonin/usr/local/cuda-10.0/lib64:/usr/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/cuda-10.0/lib64:/lib:$LD_LIBRARY_PATH
@@ -18,7 +16,7 @@ mkdir /scr/drew/
 SCRDIR=/scr/drew
 rsync -a cache/ /scr/drew/
 rsync -a CV_Sets/ /scr/drew/
-rsync -a DDG_reg.py /scr/drew/ 
+rsync -a DDG_classv2.py /scr/drew/ 
 
 echo Running on `hostname`
 echo PATH=$PATH
@@ -27,9 +25,10 @@ echo PYTHONPATH=$PYTHONPATH
 echo SCRDIR=$SCRDIR
 echo -e  '\n\n'
 
-#wd=(0 0 0.1 0.01 0.001)
-#cmd=`python3 DDG_reg.py --ligtr ${SCRDIR}/lig_train1.molcache2  --rectr ${SCRDIR}/rec_train1.molcache2 --trainfile ${SCRDIR}/train_1.txt --ligte ${SCRDIR}/lig_test1.molcache2 --recte ${SCRDIR}/rec_test1.molcache2 --testfile ${SCRDIR}/test_1.txt -wd ${wd[${SLURM_ARRAY_TASK_ID}]}`
+wd=(0 0.001 0.0005 0.005 0.0025)
+echo ${wd[${SLURM_ARRAY_TASK_ID}]}
+cmd=`python3 DDG_classv2.py --ligtr cache/lig_train1.molcache2  --rectr cache/rec_train1.molcache2 --trainfile CV_Sets/train_1.txt --ligte cache/lig_test1.molcache2 --recte cache/rec_test1.molcache2 --testfile CV_Sets/test_1.txt -wd ${wd[${SLURM_ARRAY_TASK_ID}]}`
 
-cmd=`python3 DDG_reg.py --ligtr ${SCRDIR}/lig_train1.molcache2  --rectr ${SCRDIR}/rec_train1.molcache2 --trainfile ${SCRDIR}/train_1.txt --ligte ${SCRDIR}/lig_test1.molcache2 --recte ${SCRDIR}/rec_test1.molcache2 --testfile ${SCRDIR}/test_1.txt`
+#cmd=`python3 DDG_class.py --ligtr ${SCRDIR}/lig_train1.molcache2  --rectr ${SCRDIR}/rec_train1.molcache2 --trainfile ${SCRDIR}/train_1.txt --ligte ${SCRDIR}/lig_test1.molcache2 --recte ${SCRDIR}/rec_test1.molcache2 --testfile ${SCRDIR}/test_1.txt`
 eval cmd
 exit
