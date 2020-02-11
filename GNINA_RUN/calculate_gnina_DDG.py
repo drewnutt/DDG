@@ -94,9 +94,9 @@ assert output.shape[0] == train_data.shape[0]
 gnina_lbls = output[['l_gnina_aff','l_scr','l_vina_aff']].copy()
 labels = train_data['label']
 comp_dict = gnina_lbls.eq(labels, axis=0).mean(axis=0, numeric_only=True).to_dict()
-output_string = '{}:\nMetric | Accuracy\n-----|-----\nGNINA Affinity | {:.4f}\nGNINA Score | {:.4f}'.format(args.model, comp_dict['l_gnina_aff'],comp_dict['l_scr'])
+output_string = '# {}:\nMetric | Accuracy\n-----|-----\nGNINA Affinity | {:.4f}\nGNINA Score | {:.4f}'.format(args.model, comp_dict['l_gnina_aff'],comp_dict['l_scr'])
 if args.vina:
-    output_string += 'Vina Affinity | {:.4f}'.format(comp_dict['labelvina'])
-model_stat = 'GNINA_RUN/{}_stats.txt'.format(args.model)
+    output_string += '\nVina Affinity | {:.4f}'.format(comp_dict['l_vina_aff'])
+model_stat = 'GNINA_RUN/{}_stats.md'.format(args.model)
 with open(model_stat,'w') as f:
     f.write(output_string)
