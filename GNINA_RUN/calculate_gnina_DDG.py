@@ -1,9 +1,11 @@
 import argparse
+import re
 import csv
 import pandas as pd
 from itertools import permutations
 import os
 import sys
+import numpy as np
 
 class Ligand():
     def __init__(self,name,caff,score,aff):
@@ -22,18 +24,20 @@ parser.add_argument('--model', help='gnina model used to calculate info')
 args = parser.parse_args()
 
 ligand_list = []
+name_p = re.compile('(?:/)([A-Z0-9]+)(?:\.mol2)')
 with open(args.gf, 'r') as f:
     name = ''
     aff, caff, score=0,0,0
     for idx, line in enumerate(f):
+        vals = line.split()
         if idx%5==0:
-            name = line[64:70]
+            name = re.findall(name_p,vals[4])[0]
         if idx%5==1:
-            aff = float(line[10:18])
+            aff = vals[1]
         if idx%5==2:
-            score= float(line[10:])
+            score= vals[1]
         if idx%5==3:
-            caff=float(line[12:])
+            caff= vals[1]
         if idx%5==4:
             ligand_list.append(Ligand(name,caff,score,aff))
 ligand_list.sort(key=lambda x: x.name)
@@ -44,7 +48,7 @@ with open(gnina_df,'w') as df:
 del ligand_list
 
 full_list = pd.DataFrame()
-affinity = pd.read_csv(gnina_df, sep=' ', header=None, names=['name','caff','score','aff'])
+affinity = pd.read_csv(gnina_df, sep=' ', header=None, names=['name','gnina_aff','score','vaff'], dtype={'name':str,'gnina_aff':np.float64,'score':np.float64,'vaff':np.float64})
 rec = affinity['name'].str[:4].unique().tolist()
 rec_list = affinity['name'].str[:4].tolist()
 rec.sort()
@@ -64,34 +68,35 @@ for i,r in enumerate(rec):
     lig_perms = permutations(ligs,2)
     for lig1,lig2 in lig_perms:
         try:
-            labelcaff = int(abs((float(rec_affinity.at[lig1,'caff'])) > abs(float(rec_affinity.at[lig2,'caff']))) == True)
-            labelscr = int(abs((float(rec_affinity.at[lig1,'score'])) > abs(float(rec_affinity.at[lig2,'score']))) == True)
-            labelv = int(abs((float(rec_affinity.at[lig1,'aff'])) > abs(float(rec_affinity.at[lig2,'aff']))) == True)
-            diffcaff = abs(float(rec_affinity.at[lig1,'caff'])) - abs(float(rec_affinity.at[lig2,'caff']))
-            diffscore = abs(float(rec_affinity.at[lig1,'score'])) - abs(float(rec_affinity.at[lig2,'score']))
-            diffv = abs(float(rec_affinity.at[lig1,'aff'])) - abs(float(rec_affinity.at[lig2,'aff']))
-            info = [labelcaff, diffcaff, labelscr, diffscore, labelv, diffv, lig1,lig2]
+            labelgaff = int(rec_affinity.at[lig1,'gnina_aff'] > rec_affinity.at[lig2,'gnina_aff'])
+            labelscr = int(rec_affinity.at[lig1,'score'] > rec_affinity.at[lig2,'score'])
+            labelv = int(rec_affinity.at[lig1,'vaff'] < rec_affinity.at[lig2,'vaff'])
+            diffgaff = rec_affinity.at[lig1,'gnina_aff'] - rec_affinity.at[lig2,'gnina_aff']
+            diffscore = rec_affinity.at[lig1,'score'] - rec_affinity.at[lig2,'score']
+            diffv = rec_affinity.at[lig1,'vaff'] - rec_affinity.at[lig2,'vaff']
+            info = [labelgaff, diffgaff, labelscr, diffscore, labelv, diffv, lig1,lig2]
             list_of_data.append(info)
-        except:
-            print(r,lig1,lig2)
+        except Exception as e:
+            print(r,lig1,lig2, e)
     affinity.drop('is_rec', axis=1, inplace=True)
     if i%(length/10) == 0:
         print(i/(length/10))
 output = pd.DataFrame(list_of_data)
-output.columns = ['labelcaff', 'diffcaff', 'labelscr', 'diffscr', 'labelvina','diffvina', 'lig1', 'lig2']
+output.columns = ['l_gnina_aff', 'd_gnina_aff', 'l_scr', 'd_scr', 'l_vina_aff','d_vina_aff', 'lig1', 'lig2']
 gnina_ddg = 'GNINA_RUN/gnina_DDG_{}.txt'.format(args.model)
 output.to_csv(gnina_ddg, sep=' ', index=False)
 
-train_data = pd.read_csv(args.trainf, sep=' ', header=None, names=['label','diff','lig1','lig2'], usecols=[0,1,3,4])
-train_data['lig2'] = train_data['lig2'].apply(lambda x: x[5:11])
-train_data['lig1'] = train_data['lig1'].apply(lambda x: x[5:11])
+train_data = pd.read_csv(args.trainf, sep=' ', header=None, names=['label','diff','lig1','lig2'], usecols=[0,1,3,4], dtype={'label':np.int32,'diff':np.float64})
+ligname_pattern = re.compile('(?:/)(......)(?:_.\.gninatypes)')
+train_data['lig2'] = train_data['lig2'].apply(lambda x: re.findall(ligname_pattern,x)[0])
+train_data['lig1'] = train_data['lig1'].apply(lambda x: re.findall(ligname_pattern,x)[0])
 assert output.shape[0] == train_data.shape[0]
-gnina_lbls = output[['labelcaff','labelscr','labelvina']].copy()
+gnina_lbls = output[['l_gnina_aff','l_scr','l_vina_aff']].copy()
 labels = train_data['label']
 comp_dict = gnina_lbls.eq(labels, axis=0).mean(axis=0, numeric_only=True).to_dict()
-output_string = '{}:\nMetric | Accuracy\n-----|-----\nGNINA Affinity | {}\nGNINA Score | {}'.format(args.model, comp_dict['labelcaff'],comp_dict['labelscr'])
+output_string = '{}:\nMetric | Accuracy\n-----|-----\nGNINA Affinity | {:.4f}\nGNINA Score | {:.4f}'.format(args.model, comp_dict['l_gnina_aff'],comp_dict['l_scr'])
 if args.vina:
-    output_string += 'Vina Affinity | {}'.format(comp_dict['labelvina'])
+    output_string += 'Vina Affinity | {:.4f}'.format(comp_dict['labelvina'])
 model_stat = 'GNINA_RUN/{}_stats.txt'.format(args.model)
 with open(model_stat,'w') as f:
     f.write(output_string)

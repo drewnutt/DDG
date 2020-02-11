@@ -8,17 +8,17 @@
 #SBATCH --constraint=C5
 
 echo $1
-num=102220
-for file in $(ls slurm-${num}_*.out)
-do
-	grep 'separated_sets\|Affinity\|CNNa\|CNNs\|Intramolecular' $file >> GNINA_RUN/all_output_$1.txt
-done
-
-lines=$(grep -c 'Affinity' GNINA_RUN/all_output_$1.txt)
-echo $lines
-if (($lines==7704))
-then
-	rm slurm-${num}_*.out
-fi
+#num=102220
+#for file in $(ls slurm-${num}_*.out)
+#do
+#	grep 'separated_sets\|Affinity\|CNNa\|CNNs\|Intramolecular' $file >> GNINA_RUN/all_output_$1.txt
+#done
+#
+#lines=$(grep -c 'Affinity' GNINA_RUN/all_output_$1.txt)
+#echo $lines
+#if (($lines==7704))
+#then
+#	rm slurm-${num}_*.out
+#fi
 
 python3 GNINA_RUN/calculate_gnina_DDG.py -gf GNINA_RUN/better_all_output_$1.txt --trainf separated_sets/training_input.txt --model $1 --vina
