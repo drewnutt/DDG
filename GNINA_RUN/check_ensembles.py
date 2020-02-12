@@ -27,7 +27,7 @@ assert ensemble.shape[0] == train_data.shape[0]
 gnina_lbls = ensemble[['l_gnina_aff','l_scr']].copy()
 labels = train_data['label']
 comp_dict = gnina_lbls.eq(labels, axis=0).mean(axis=0, numeric_only=True).to_dict()
-output_string = '{}:\nMetric | Accuracy\n-----|-----\nGNINA Affinity | {}\nGNINA Score | {}'.format(args.model, comp_dict['l_gnina_aff'],comp_dict['l_scr'])
-model_stat = '{}_{}_stats.txt'.format('ensemble',args.model)
+output_string = '{}:\nMetric | Accuracy\n-----|-----\nGNINA Affinity | {:.4f}\nGNINA Score | {:.4f}'.format(args.model, comp_dict['l_gnina_aff'],comp_dict['l_scr'])
+model_stat = '{}_{}_stats.md'.format('ensemble',args.model)
 with open(model_stat,'w') as f:
     f.write(output_string)

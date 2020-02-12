@@ -22,4 +22,4 @@ echo $model
 #	rm slurm-${num}_*.out
 #fi
 
-python3 GNINA_RUN/calculate_gnina_DDG.py -gf GNINA_RUN/better_all_output_$model.txt --trainf separated_sets/training_input.txt --model $model --vina
+python3 GNINA_RUN/calculate_gnina_DDG.py -gf GNINA_RUN/better_all_output_$model.txt --trainf CV_Sets/test_1.txt --model $model --vina --cv_set

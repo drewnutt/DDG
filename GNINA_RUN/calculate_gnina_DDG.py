@@ -21,6 +21,7 @@ parser.add_argument('-gf', required=True, help='file containing condensed gnina 
 parser.add_argument('--trainf', required=True, help='training input file for DDG model')
 parser.add_argument('--vina', action='store_true', help='report classification using Vina affinity')
 parser.add_argument('--model', help='gnina model used to calculate info')
+parser.add_argument('--cv_set', action='store_true', help='check accuracy on subset of all data')
 args = parser.parse_args()
 
 ligand_list = []
@@ -88,15 +89,28 @@ output.to_csv(gnina_ddg, sep=' ', index=False)
 
 train_data = pd.read_csv(args.trainf, sep=' ', header=None, names=['label','diff','lig1','lig2'], usecols=[0,1,3,4], dtype={'label':np.int32,'diff':np.float64})
 ligname_pattern = re.compile('(?:/)(......)(?:_.\.gninatypes)')
+recname_pattern = re.compile('(....)')
 train_data['lig2'] = train_data['lig2'].apply(lambda x: re.findall(ligname_pattern,x)[0])
 train_data['lig1'] = train_data['lig1'].apply(lambda x: re.findall(ligname_pattern,x)[0])
+outfile_addn = ''
+if args.cv_set:
+    u_train_r = train_data['lig1'].str[:4].unique().tolist()
+    gnina_r = output['lig1'].str[:4].tolist()
+    is_train = pd.Series([item in u_train_r for item in gnina_r])
+        
+    output = output.assign(is_train = is_train.values)
+    output = output[output.is_train == 1]
+    outfile_addn = 'cv_set_'
+    output.sort_values(by=['lig1','lig2'],inplace=True, ignore_index=True)
+    train_data.sort_values(by=['lig1','lig2'],inplace=True, ignore_index=True)
 assert output.shape[0] == train_data.shape[0]
+print(output.head(10),train_data.head(10))
 gnina_lbls = output[['l_gnina_aff','l_scr','l_vina_aff']].copy()
 labels = train_data['label']
 comp_dict = gnina_lbls.eq(labels, axis=0).mean(axis=0, numeric_only=True).to_dict()
 output_string = '# {}:\nMetric | Accuracy\n-----|-----\nGNINA Affinity | {:.4f}\nGNINA Score | {:.4f}'.format(args.model, comp_dict['l_gnina_aff'],comp_dict['l_scr'])
 if args.vina:
     output_string += '\nVina Affinity | {:.4f}'.format(comp_dict['l_vina_aff'])
-model_stat = 'GNINA_RUN/{}_stats.md'.format(args.model)
+model_stat = 'GNINA_RUN/{}{}_stats.md'.format(outfile_addn, args.model)
 with open(model_stat,'w') as f:
     f.write(output_string)
