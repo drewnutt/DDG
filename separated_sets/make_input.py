@@ -43,7 +43,7 @@ for i,r in enumerate(rec):
 		l1 = rec_affinity.loc[rec_affinity['LigandMonomerID'] == ligdict[lig1]]
 		l2 = rec_affinity.loc[rec_affinity['LigandMonomerID'] == ligdict[lig2]]
 		try:
-			label = int((float(l1['log(Ki)']) > float(l2['log(Ki)'])) == True)
+			label = int(float(l1['log(Ki)']) > float(l2['log(Ki)']))
 		except:
 			print(r,ligdict[lig1],ligdict[lig2])
 			sys.exit();

@@ -1,6 +1,6 @@
 # general_default2018_1:
 Metric | Accuracy
 -----|-----
-GNINA Affinity | 0.4122
-GNINA Score | 0.4655
-Vina Affinity | 0.4485
+GNINA Affinity | 0.5878
+GNINA Score | 0.5345
+Vina Affinity | 0.5515

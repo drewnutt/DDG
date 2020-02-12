@@ -68,9 +68,9 @@ for i,r in enumerate(rec):
     lig_perms = permutations(ligs,2)
     for lig1,lig2 in lig_perms:
         try:
-            labelgaff = int(rec_affinity.at[lig1,'gnina_aff'] > rec_affinity.at[lig2,'gnina_aff'])
-            labelscr = int(rec_affinity.at[lig1,'score'] > rec_affinity.at[lig2,'score'])
-            labelv = int(rec_affinity.at[lig1,'vaff'] < rec_affinity.at[lig2,'vaff'])
+            labelgaff = int(rec_affinity.at[lig1,'gnina_aff'] < rec_affinity.at[lig2,'gnina_aff']) #1 if 2nd ligand has higher affinity(0 if 1st ligand has higher affinity)
+            labelscr = int(rec_affinity.at[lig1,'score'] < rec_affinity.at[lig2,'score'])
+            labelv = int(rec_affinity.at[lig1,'vaff'] > rec_affinity.at[lig2,'vaff'])
             diffgaff = rec_affinity.at[lig1,'gnina_aff'] - rec_affinity.at[lig2,'gnina_aff']
             diffscore = rec_affinity.at[lig1,'score'] - rec_affinity.at[lig2,'score']
             diffv = rec_affinity.at[lig1,'vaff'] - rec_affinity.at[lig2,'vaff']

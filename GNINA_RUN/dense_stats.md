@@ -1,6 +1,6 @@
 # dense:
 Metric | Accuracy
 -----|-----
-GNINA Affinity | 0.4464
-GNINA Score | 0.4879
-Vina Affinity | 0.4485
+GNINA Affinity | 0.5536
+GNINA Score | 0.5121
+Vina Affinity | 0.5515
