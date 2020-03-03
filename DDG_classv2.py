@@ -8,10 +8,9 @@ from torch.nn import init
 import os
 import wandb
 import argparse
-import matplotlib.pyplot as plt
 
 class Net(nn.Module):
-	def __init__(self, dims):
+	def __init__(self, dims, dr=0.0):
 		super(Net, self).__init__()
 		self.pool0 = nn.MaxPool3d(2)
 		self.conv1 = nn.Conv3d(dims[0], 32, kernel_size=3, padding=1)
@@ -22,6 +21,7 @@ class Net(nn.Module):
 
 		self.last_layer_size = dims[1]//8 * dims[2]//8 * dims[3]//8 * 128
 		self.fc1 = nn.Linear(self.last_layer_size, 1)
+		self.lin_dropout = nn.Dropout(p=dr)
 		self.out_act = nn.Sigmoid()
 
 	def forward(self, x):
@@ -32,6 +32,7 @@ class Net(nn.Module):
 		x = self.pool2(x)
 		x = F.relu(self.conv3(x))
 		x = x.view(-1, self.last_layer_size)
+		x = self.lin_dropout(x)
 		x = self.fc1(x)
 		x = self.out_act(x)
 		return x
@@ -168,17 +169,21 @@ parser.add_argument('--ligte', required=True, help='location of testing ligand c
 parser.add_argument('--recte', required=True, help='location of testing receptor cache file input')
 parser.add_argument('--testfile', required=True, help='location of testing information')
 parser.add_argument('--weightdecay','-wd', default=0.0,type=float, help='weight decay for optimizer')
+parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
+parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
+parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
 args = parser.parse_args()
 
 wandb.init(entity='andmcnutt', project='DDG_model')
 
 config = wandb.config
 config.batch_size = 64
-config.lr = 0.01
-config.momentum = 0.9
+config.lr = args.lr
+config.momentum = args.momentum
 config.threshold=0.5
 config.epochs= 200
 config.weight_decay=args.weightdecay
+config.dr = args.dropout
 
 print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
 
@@ -202,7 +207,13 @@ tensor_shape = (config.batch_size,)+dims
 tr_nums=(one_e_tr,leftover_tr,trsize)
 tt_nums=(one_e_tt,leftover_tt, tssize)
 
-model = Net(dims).to('cuda')
+model = Net(dims,config.dr)
+if torch.cuda.device_count() > 1:
+    print("Using {} GPUs".format(torch.cuda.device_count()))
+    model = nn.DataParallel(model)
+else:
+    print('GPUS: {}'.format(torch.cuda.device_count()))
+model.to('cuda')
 model.apply(weights_init)
 
 optimizer = optim.SGD(model.parameters(), lr=config.lr, momentum=config.momentum,weight_decay=config.weight_decay)
@@ -226,12 +237,8 @@ for epoch in range(config.epochs):
 	tr_loss, tr_acc, out_dist =  train(config, model, traine, optimizer, epoch,tr_nums)
 	tt_loss, tt_acc, tt_pr, tt_rec, auc, out_d = test(config, model, teste, tt_nums)
 	
-	if epoch%10 == 0:
-	    plt.hist(out_dist,bins=10)
-	    wandb.log({"output distribution Train": [wandb.Image(plt, caption="output distribution of network")]}, commit=False)
-	    plt.clf()
-	    plt.hist(out_d,bins=10)
-	    wandb.log({"output distribution Test": [wandb.Image(plt, caption="output distribution of model")]}, commit=False)
+	wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
+	wandb.log({"Sutput Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
 	wandb.log({
 		"Avg Train Loss": tr_loss,
 		"Train Accuracy": tr_acc,

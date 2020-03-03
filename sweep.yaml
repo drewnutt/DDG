@@ -1,0 +1,37 @@
+method: bayes
+metric:
+  goal: minimize
+  name: Avg Test Loss
+early_terminate:
+  type: hyperband
+  min_iter: 3
+parameters:
+  ligtr:
+    value: "cache/lig_train4.molcache2"
+  rectr:
+    value: "cache/rec_train4.molcache2"
+  trainfile:
+    value: "CV_Sets/train_4.txt"
+  ligte:
+    value: "cache/lig_val4.molcache2"
+  recte:
+    value: "cache/rec_val4.molcache2"
+  testfile:
+    value: "CV_Sets/val_4.txt"
+  dropout:
+    distribution: uniform
+    max: 0.5
+    min: 0
+  lr:
+    distribution: uniform
+    max: 0.2
+    min: 0.005
+  momentum:
+    distribution: uniform
+    max: 1.0
+    min: 0.0
+  weightdecay:
+    distribution: uniform
+    max: 0.01
+    min: 0
+program: DDG_classv2.py 
