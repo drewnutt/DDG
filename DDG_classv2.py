@@ -9,48 +9,142 @@ import os
 import wandb
 import argparse
 
+class View(nn.Module):
+    def __init__(self,shape):
+        super(View, self).__init__()
+        self.shape = shape
+    def forward(self, input):
+        return input.view(*self.shape)
+
 class Net(nn.Module):
-	def __init__(self, dims, dr=0.0):
-		super(Net, self).__init__()
-		self.pool0 = nn.MaxPool3d(2)
-		self.conv1 = nn.Conv3d(dims[0], 32, kernel_size=3, padding=1)
-		self.pool1 = nn.MaxPool3d(2)
-		self.conv2 = nn.Conv3d(32, 64, kernel_size=3, padding=1)
-		self.pool2 = nn.MaxPool3d(2)
-		self.conv3 = nn.Conv3d(64, 128, kernel_size=3, padding=1)
+    def __init__(self, dims, dr=0.0):
+        super(Net, self).__init__()
+        self.modules = []
+        self.residuals = []
+        nchannels = dims[0]
+        ksize = args.module_kernel_size
+        pad = ksize//2
+        fmult = 1
+        div = 1
 
-		self.last_layer_size = dims[1]//8 * dims[2]//8 * dims[3]//8 * 128
-		self.fc1 = nn.Linear(self.last_layer_size, 1)
-		self.lin_dropout = nn.Dropout(p=dr)
-		self.out_act = nn.Sigmoid()
+        #select activation function
+        func = F.relu
+        if args.activation_function == 'elu':
+            func = F.elu
+        elif args.activation_function == 'sigmoid':
+            func = F.sigmoid
+        elif args.activation_function == 'lrelu':
+            func = F.leaky_relu
+        
+        inmultincr = 0
+        if args.module_connect == 'dense':
+            inmultincr=1
 
-	def forward(self, x):
-		x = self.pool0(x)
-		x = F.relu(self.conv1(x))
-		x = self.pool1(x)
-		x = F.relu(self.conv2(x))
-		x = self.pool2(x)
-		x = F.relu(self.conv3(x))
-		x = x.view(-1, self.last_layer_size)
-		x = self.lin_dropout(x)
-		x = self.fc1(x)
-		x = self.out_act(x)
-		return x
+        for m in range(args.num_modules):
+            module = []
+            inmult = 1
+            filters = int(args.module_filters*fmult)
+            startchannels = nchannels
+            for i in range(args.module_depth):
+                conv = nn.Conv3d(nchannels*inmult, filters, kernel_size=ksize,padding=pad)
+                inmult += inmultincr
+                self.add_module('conv_{}_{}'.format(m,i),conv)
+                module.append(conv)
+                module.append(func)
+                nchannels = filters
+            if args.module_connect == 'residual':
+                conv = nn.Conv3d(startchannels,nchannels, kernel_size=1,padding=0)
+                self.add_module('resconv_{}'.format(m),conv)
+                self.residuals.append(conv)
+            if m < args.num_modules-1:
+                pool = nn.MaxPool3d(2)
+                self.add_module('pool_{}'.format(m),pool)
+                module.append(pool)
+                div *= 2
+            
+            self.modules.append(module)
+            fmult *= args.filter_factor
+        last_size = int(dims[1]//div * dims[2]//div * dims[3]//div * filters)
+        lastmod = []
+        lastmod.append(View((-1,last_size)))
+
+        if args.hidden_size > 0:
+            fc = nn.Linear(last_size, args.hidden_size)
+            self.add_module('hidden_fc',fc)
+            lastmod.append(fc)
+            lastmod.append(func)
+            last_size = args.hidden_size
+
+        fc = nn.Linear(last_size,1)
+        self.add_module('last_fc',fc)
+        lastmod.append(fc)
+        lastmod.append(nn.Sigmoid)
+        self.modules.append(lastmod)
+
+#        self.pool0 = nn.MaxPool3d(2)
+#        self.conv1 = nn.Conv3d(dims[0], 32, kernel_size=3, padding=1)
+#        self.pool1 = nn.MaxPool3d(2)
+#        self.conv2 = nn.Conv3d(32, 64, kernel_size=3, padding=1)
+#        self.pool2 = nn.MaxPool3d(2)
+#        self.conv3 = nn.Conv3d(64, 128, kernel_size=3, padding=1)
+#
+#        self.last_layer_size = dims[1]//8 * dims[2]//8 * dims[3]//8 * 128
+#        self.fc1 = nn.Linear(self.last_layer_size, 1)
+#        self.lin_dropout = nn.Dropout(p=dr)
+#        self.out_act = nn.Sigmoid()
+
+    def forward(self, x):
+        isdense = False
+        isres = False
+        if args.module_connect == 'dense':
+            isdense = True
+        if args.module_connect == 'residual':
+            isres = True
+
+        for (m,module) in enumerate(self.modules):
+            preconvs = []
+            if isres and len(self.residuals) > m:
+                passthrough = self.residuals[m](x)
+            else:
+                isres = False
+            for (l,layer) in enumerate(module):
+                if isinstance(layer,nn.Conv3d) and isdense:
+                    if preconvs:
+                        x = torch.cat((x,*preconvs),1)
+                if isres and l == len(module)-1:
+                    x = x + passthrough
+                x = layer(x)
+
+                if isinstance(layer,nn.Conv3d) and isdense:
+                    preconvs.append(x)
+
+#        x = self.pool0(x)
+#        x = F.relu(self.conv1(x))
+#        x = self.pool1(x)
+#        x = F.relu(self.conv2(x))
+#        x = self.pool2(x)
+#        x = F.relu(self.conv3(x))
+#        x = x.view(-1, self.last_layer_size)
+#        x = self.lin_dropout(x)
+#        x = self.fc1(x)
+#        x = self.out_act(x)
+        return x
 
 def weights_init(m):
-	if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-		init.xavier_uniform_(m.weight.data)
+    if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+        init.xavier_uniform_(m.weight.data)
+        init.constant_(m.bias.data,0)
 
 def confusion(output, label, tp, fp, tn, fn):
-	conf_matrix = torch.zeros(2,2)
-	for out, lab in zip(output,label):
-		conf_matrix[int(out),int(lab)] += 1
-	tp += conf_matrix[0,0]
-	fp += conf_matrix[0,1]
-	fn += conf_matrix[1,0]
-	tn += conf_matrix[1,1]
+    conf_matrix = torch.zeros(2,2)
+    for out, lab in zip(output,label):
+        conf_matrix[int(out),int(lab)] += 1
+    tp += conf_matrix[0,0]
+    fp += conf_matrix[0,1]
+    fn += conf_matrix[1,0]
+    tn += conf_matrix[1,1]
 
-	return tp,fp,tn,fn
+    return tp,fp,tn,fn
 
 def get_AUC(pred,label):
         P = label.sum()
@@ -74,7 +168,7 @@ def get_AUC(pred,label):
         return 1-(area/(P*N))
 
 def trap_area(FP,fp,TP,tp):
-	return abs(FP-fp) * (TP+tp)/2
+    return abs(FP-fp) * (TP+tp)/2
 
 def get_labels(ll_out, threshold):
         pred_label = ll_out >= threshold
@@ -130,7 +224,7 @@ def test(args, model, teste, size):
 
     output_dist = []
     with torch.no_grad():
-        for _ in range(size[0]):	
+        for _ in range(size[0]):    
             batch = teste.next_batch(args.batch_size)
             gmaker.forward(batch, input_tensor, 0, random_rotation=False) 
             batch.extract_label(0, float_labels)
@@ -172,6 +266,9 @@ parser.add_argument('--weightdecay','-wd', default=0.0,type=float, help='weight 
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
+parser.add_argument('--solver', default="sgd", choices=('adam','sgd'), type=str, help="solver to use")
+parser.add_argument('--module_depth',default
+parser.add_argument('--activation_function', default='relu', choices=('relu','elu','sigmoid','lrelu'),help='non-linear activation function to use')
 args = parser.parse_args()
 
 wandb.init(entity='andmcnutt', project='DDG_model')
@@ -234,23 +331,23 @@ if leftover_tt != 0:
 wandb.watch(model,log='all')
 
 for epoch in range(config.epochs):
-	tr_loss, tr_acc, out_dist =  train(config, model, traine, optimizer, epoch,tr_nums)
-	tt_loss, tt_acc, tt_pr, tt_rec, auc, out_d = test(config, model, teste, tt_nums)
-	
-	wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
-	wandb.log({"Sutput Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
-	wandb.log({
-		"Avg Train Loss": tr_loss,
-		"Train Accuracy": tr_acc,
-		"Avg Test Loss": tt_loss,
-		"Test Accuracy": tt_acc,
-		"Test Precision": tt_pr,
-		"Test Recall": tt_rec,
-		"AUC": auc})
+    tr_loss, tr_acc, out_dist =  train(config, model, traine, optimizer, epoch,tr_nums)
+    tt_loss, tt_acc, tt_pr, tt_rec, auc, out_d = test(config, model, teste, tt_nums)
+    
+    wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
+    wandb.log({"Sutput Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
+    wandb.log({
+        "Avg Train Loss": tr_loss,
+        "Train Accuracy": tr_acc,
+        "Avg Test Loss": tt_loss,
+        "Test Accuracy": tt_acc,
+        "Test Precision": tt_pr,
+        "Test Recall": tt_rec,
+        "AUC": auc})
 
-	if tr_acc == 1.00:
-		print('Reached 100% train accuracy')
-		break
+    if tr_acc == 1.00:
+        print('Reached 100% train accuracy')
+        break
 
 torch.save(model.state_dict(), "model.h5")
 wandb.save('model.h5')
