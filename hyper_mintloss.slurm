@@ -2,7 +2,7 @@
 #SBATCH -J hyperparam_optim
 #SBATCH -t 24:00:00
 #SBATCH -N 1
-#SBATCH -p any_gpu
+#SBATCH -p dept_gpu
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --constraint=C5
@@ -21,4 +21,4 @@ echo LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 echo PYTHONPATH=$PYTHONPATH
 echo cur_dir=$PWD
 echo -e  '\n\n'
-wandb agent --count 1 andmcnutt/DDG_model/4sd26rsd
+wandb agent --count 1 andmcnutt/DDG_model/xw4bbl4d

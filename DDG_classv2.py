@@ -9,6 +9,29 @@ import os
 import wandb
 import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--ligtr', required=True, help='location of training ligand cache file input')
+parser.add_argument('--rectr', required=True, help='location of training receptor cache file input')
+parser.add_argument('--trainfile', required=True, help='location of training information')
+parser.add_argument('--ligte', required=True, help='location of testing ligand cache file input')
+parser.add_argument('--recte', required=True, help='location of testing receptor cache file input')
+parser.add_argument('--testfile', required=True, help='location of testing information')
+parser.add_argument('--weightdecay','-wd', default=0.0,type=float, help='weight decay for optimizer')
+parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
+parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
+parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
+parser.add_argument('--solver', default="sgd", choices=('adam','sgd'), type=str, help="solver to use")
+parser.add_argument('--module_depth',default=1,type=int,help="number of layers in module")
+parser.add_argument('--num_modules',default=3,type=int,help="number of convolutional modules")
+parser.add_argument('--module_kernel_size',default=3, type=int,help="kernel size of module")
+parser.add_argument('--module_connect',default='straight',choices=('straight','dense','residual'),type=str, help='how module is connected')
+parser.add_argument('--module_filters',default=64,type=int,help="number of filters in each module")
+parser.add_argument('--filter_factor',default=2,type=float,help="set filters to this raised to the current module index")
+parser.add_argument('--hidden_size',default=0,type=int,help="size of hidden layer, if zero then no hidden layer")
+parser.add_argument('--pool_type',default='max',choices=('max','avg'),help='type of pool to use between modules')
+parser.add_argument('--activation_function', default='relu', choices=('relu','elu','sigmoid','lrelu'),help='non-linear activation function to use')
+args = parser.parse_args()
+
 class View(nn.Module):
     def __init__(self,shape):
         super(View, self).__init__()
@@ -17,7 +40,7 @@ class View(nn.Module):
         return input.view(*self.shape)
 
 class Net(nn.Module):
-    def __init__(self, dims, dr=0.0):
+    def __init__(self, dims):
         super(Net, self).__init__()
         self.modules = []
         self.residuals = []
@@ -26,6 +49,7 @@ class Net(nn.Module):
         pad = ksize//2
         fmult = 1
         div = 1
+        dropout = nn.Dropout(p=args.dropout)
 
         #select activation function
         func = F.relu
@@ -58,6 +82,8 @@ class Net(nn.Module):
                 self.residuals.append(conv)
             if m < args.num_modules-1:
                 pool = nn.MaxPool3d(2)
+                if args.pool_type == 'avg':
+                    pool = nn.AvgPool3d(2)
                 self.add_module('pool_{}'.format(m),pool)
                 module.append(pool)
                 div *= 2
@@ -69,16 +95,19 @@ class Net(nn.Module):
         lastmod.append(View((-1,last_size)))
 
         if args.hidden_size > 0:
+            self.add_module("linear_dropout",dropout)
+            lastmod.append(dropout)
             fc = nn.Linear(last_size, args.hidden_size)
             self.add_module('hidden_fc',fc)
             lastmod.append(fc)
             lastmod.append(func)
             last_size = args.hidden_size
 
+        lastmod.append(dropout)
         fc = nn.Linear(last_size,1)
         self.add_module('last_fc',fc)
         lastmod.append(fc)
-        lastmod.append(nn.Sigmoid)
+        lastmod.append(nn.Sigmoidi())
         self.modules.append(lastmod)
 
 #        self.pool0 = nn.MaxPool3d(2)
@@ -174,7 +203,7 @@ def get_labels(ll_out, threshold):
         pred_label = ll_out >= threshold
         return pred_label
 
-def train(args, model, traine, optimizer, epoch, size):
+def train(model, traine, optimizer, epoch, size):
     model.train()
     train_loss = 0
     correct = 0
@@ -182,16 +211,16 @@ def train(args, model, traine, optimizer, epoch, size):
 
     output_dist = []
     for _ in range(size[0]):
-        batch = traine.next_batch(args.batch_size)
+        batch = traine.next_batch(batch_size)
         gmaker.forward(batch, input_tensor,random_translation=2.0, random_rotation=True) 
         batch.extract_label(0, float_labels)
         labels = torch.unsqueeze(float_labels,1).float().to('cuda')
         optimizer.zero_grad()
         output = model(input_tensor)
         loss = criterion(output,labels)
-        pred_label = get_labels(output, args.threshold)
+        pred_label = get_labels(output, threshold)
         correct += (pred_label == labels).sum().item()
-        total += config.batch_size
+        total += batch_size
         train_loss += loss
         loss.backward()
         optimizer.step()
@@ -204,7 +233,7 @@ def train(args, model, traine, optimizer, epoch, size):
         optimizer.zero_grad()
         output = model(tr_l_tensor)
         loss = criterion(output,labels)
-        pred_label = get_labels(output, args.threshold)
+        pred_label = get_labels(output, threshold)
         correct += (pred_label == labels).sum().item()
         total += size[1]
         train_loss += loss
@@ -214,7 +243,7 @@ def train(args, model, traine, optimizer, epoch, size):
 
     return train_loss/(size[2]), (correct/total), output_dist
 
-def test(args, model, teste, size):
+def test(model, teste, size):
     model.eval()
     test_loss = 0
     correct = 0
@@ -225,14 +254,14 @@ def test(args, model, teste, size):
     output_dist = []
     with torch.no_grad():
         for _ in range(size[0]):    
-            batch = teste.next_batch(args.batch_size)
+            batch = teste.next_batch(batch_size)
             gmaker.forward(batch, input_tensor, 0, random_rotation=False) 
             batch.extract_label(0, float_labels)
             labels = torch.unsqueeze(float_labels,1).float().to('cuda')
 
             output = model(input_tensor)
             loss = criterion(output,labels)
-            pred_label= get_labels(output, args.threshold)
+            pred_label= get_labels(output, threshold)
             correct += (pred_label == labels).sum().item()
             tp,fp,tn,fn = confusion(pred_label,labels,tp,fp,tn,fn)
             test_loss += loss
@@ -246,7 +275,7 @@ def test(args, model, teste, size):
             labels = torch.unsqueeze(tt_l_labels,1).float().to('cuda')
             output = model(tt_l_tensor)
             loss = criterion(output,labels)
-            pred_label = get_labels(output, args.threshold)
+            pred_label = get_labels(output, threshold)
             correct += (pred_label == labels).sum().item()
             tp,fp,tn,fn = confusion(pred_label,labels,tp,fp,tn,fn)
             test_loss += loss
@@ -255,32 +284,13 @@ def test(args, model, teste, size):
 
     return test_loss/(size[2]), (tp+tn)/(tp+fp+tn+fn), (tp)/(tp+fp), (tp)/(tp+fn), tot_auc/(size[0]+int(size[1]>0)), output_dist
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--ligtr', required=True, help='location of training ligand cache file input')
-parser.add_argument('--rectr', required=True, help='location of training receptor cache file input')
-parser.add_argument('--trainfile', required=True, help='location of training information')
-parser.add_argument('--ligte', required=True, help='location of testing ligand cache file input')
-parser.add_argument('--recte', required=True, help='location of testing receptor cache file input')
-parser.add_argument('--testfile', required=True, help='location of testing information')
-parser.add_argument('--weightdecay','-wd', default=0.0,type=float, help='weight decay for optimizer')
-parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
-parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
-parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
-parser.add_argument('--solver', default="sgd", choices=('adam','sgd'), type=str, help="solver to use")
-parser.add_argument('--module_depth',default
-parser.add_argument('--activation_function', default='relu', choices=('relu','elu','sigmoid','lrelu'),help='non-linear activation function to use')
-args = parser.parse_args()
 
-wandb.init(entity='andmcnutt', project='DDG_model')
+wandb.init(entity='andmcnutt', project='DDG_model',config=args)
 
-config = wandb.config
-config.batch_size = 64
-config.lr = args.lr
-config.momentum = args.momentum
-config.threshold=0.5
-config.epochs= 200
-config.weight_decay=args.weightdecay
-config.dr = args.dropout
+#Parameters that are not important for hyperparameter sweep
+batch_size=64
+epochs=200
+threshold=0.5
 
 print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
 
@@ -293,18 +303,18 @@ teste.populate(args.testfile)
 
 trsize = traine.size()
 tssize = teste.size()
-one_e_tr = int(trsize/config.batch_size)
-leftover_tr = trsize - one_e_tr * config.batch_size
-one_e_tt = int(tssize/config.batch_size)
-leftover_tt = tssize - one_e_tt * config.batch_size
+one_e_tr = int(trsize/batch_size)
+leftover_tr = trsize - one_e_tr * batch_size
+one_e_tt = int(tssize/batch_size)
+leftover_tt = tssize - one_e_tt * batch_size
 
 gmaker = molgrid.GridMaker()
 dims = gmaker.grid_dimensions(42)
-tensor_shape = (config.batch_size,)+dims
+tensor_shape = (batch_size,)+dims
 tr_nums=(one_e_tr,leftover_tr,trsize)
 tt_nums=(one_e_tt,leftover_tt, tssize)
 
-model = Net(dims,config.dr)
+model = Net(dims)
 if torch.cuda.device_count() > 1:
     print("Using {} GPUs".format(torch.cuda.device_count()))
     model = nn.DataParallel(model)
@@ -313,11 +323,13 @@ else:
 model.to('cuda')
 model.apply(weights_init)
 
-optimizer = optim.SGD(model.parameters(), lr=config.lr, momentum=config.momentum,weight_decay=config.weight_decay)
+optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum,weightdecay=args.weightdecay)
+if solver=="adam":
+    optimizer=optim.Adam(model.parameters(), lr=args.lr, weightdecay=args.weightdecay)
 criterion = nn.BCELoss()
 
 input_tensor = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
-float_labels = torch.zeros(config.batch_size, dtype=torch.float32)
+float_labels = torch.zeros(batch_size, dtype=torch.float32)
 
 if leftover_tr != 0:
     tr_leftover_shape = (leftover_tr,) + dims
@@ -330,9 +342,9 @@ if leftover_tt != 0:
 
 wandb.watch(model,log='all')
 
-for epoch in range(config.epochs):
-    tr_loss, tr_acc, out_dist =  train(config, model, traine, optimizer, epoch,tr_nums)
-    tt_loss, tt_acc, tt_pr, tt_rec, auc, out_d = test(config, model, teste, tt_nums)
+for epoch in range(epochs):
+    tr_loss, tr_acc, out_dist =  train(model, traine, optimizer, epoch,tr_nums)
+    tt_loss, tt_acc, tt_pr, tt_rec, auc, out_d = test(model, teste, tt_nums)
     
     wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
     wandb.log({"Sutput Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
