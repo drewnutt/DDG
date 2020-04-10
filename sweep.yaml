@@ -21,21 +21,15 @@ parameters:
   testfile:
     value: "CV_Sets/val_4.txt"
   dropout:
-    distribution: uniform
-    max: 0.5
-    min: 0
+    value: 0
   lr:
     distribution: uniform
-    max: 0.2
-    min: 0.005
-  momentum:
-    distribution: uniform
-    max: 1.0
-    min: 0.0
-  weightdecay:
-    distribution: uniform
     max: 0.01
-    min: 0
+    min: 0.00001
+  momentum:
+    value: 0.0
+  weightdecay:
+    value: 0
   activation_function:
     values:
       - elu
@@ -59,19 +53,16 @@ parameters:
       - residual
   module_depth:
     distribution: int_uniform
-    max: 5
+    max: 3
     min: 1
   module_filters:
     values:
     - 32
     - 64
-    - 128
-    - 256
   module_kernel_size:
     values:
     - 3
     - 5
-    - 7
   num_modules:
     distribution: int_uniform
     max: 5
