@@ -80,7 +80,7 @@ class Net(nn.Module):
                 conv = nn.Conv3d(startchannels,nchannels, kernel_size=1,padding=0)
                 self.add_module('resconv_{}'.format(m),conv)
                 self.residuals.append(conv)
-            if m < args.num_modules-1:
+            if m < args.num_modules:
                 pool = nn.MaxPool3d(2)
                 if args.pool_type == 'avg':
                     pool = nn.AvgPool3d(2)
@@ -107,20 +107,8 @@ class Net(nn.Module):
         fc = nn.Linear(last_size,1)
         self.add_module('last_fc',fc)
         lastmod.append(fc)
-        lastmod.append(nn.Sigmoidi())
+        lastmod.append(nn.Sigmoid())
         self.modules.append(lastmod)
-
-#        self.pool0 = nn.MaxPool3d(2)
-#        self.conv1 = nn.Conv3d(dims[0], 32, kernel_size=3, padding=1)
-#        self.pool1 = nn.MaxPool3d(2)
-#        self.conv2 = nn.Conv3d(32, 64, kernel_size=3, padding=1)
-#        self.pool2 = nn.MaxPool3d(2)
-#        self.conv3 = nn.Conv3d(64, 128, kernel_size=3, padding=1)
-#
-#        self.last_layer_size = dims[1]//8 * dims[2]//8 * dims[3]//8 * 128
-#        self.fc1 = nn.Linear(self.last_layer_size, 1)
-#        self.lin_dropout = nn.Dropout(p=dr)
-#        self.out_act = nn.Sigmoid()
 
     def forward(self, x):
         isdense = False
@@ -240,7 +228,6 @@ def train(model, traine, optimizer, epoch, size):
         loss.backward()
         optimizer.step()
         output_dist += output.flatten().tolist()
-
     return train_loss/(size[2]), (correct/total), output_dist
 
 def test(model, teste, size):
@@ -288,7 +275,7 @@ def test(model, teste, size):
 wandb.init(entity='andmcnutt', project='DDG_model',config=args)
 
 #Parameters that are not important for hyperparameter sweep
-batch_size=64
+batch_size=32
 epochs=200
 threshold=0.5
 
@@ -320,13 +307,14 @@ if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model)
 else:
     print('GPUS: {}'.format(torch.cuda.device_count()))
-model.to('cuda')
+model.to('cuda:0')
 model.apply(weights_init)
 
-optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum,weightdecay=args.weightdecay)
-if solver=="adam":
-    optimizer=optim.Adam(model.parameters(), lr=args.lr, weightdecay=args.weightdecay)
+optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum,weight_decay=args.weightdecay)
+if args.solver=="adam":
+    optimizer=optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weightdecay)
 criterion = nn.BCELoss()
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=0.00001, factor=0.5, patience=5, verbose=True)
 
 input_tensor = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 float_labels = torch.zeros(batch_size, dtype=torch.float32)
@@ -345,6 +333,7 @@ wandb.watch(model,log='all')
 for epoch in range(epochs):
     tr_loss, tr_acc, out_dist =  train(model, traine, optimizer, epoch,tr_nums)
     tt_loss, tt_acc, tt_pr, tt_rec, auc, out_d = test(model, teste, tt_nums)
+    scheduler.step(tr_loss)
     
     wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
     wandb.log({"Sutput Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
