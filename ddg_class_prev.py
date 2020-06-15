@@ -106,9 +106,10 @@ class Net(nn.Module):
 			lastmod.append(func)
 			last_size = args.hidden_size
 
+		self.modules.append(lastmod)
+
 		self.fc = nn.Linear(last_size,1)
 		self.add_module('last_fc',self.fc)
-		self.modules.append(lastmod)
 
 	def forward_one(self, x): #should approximate the affinity of the receptor/ligand pair
 		isdense = False
@@ -141,7 +142,7 @@ class Net(nn.Module):
 		lig1 = self.forward_one(x1)
 		lig2 = self.forward_one(x2)
 		diff = self.dropout(lig1 - lig2)
-		return self.fc(diff)
+		return F.sigmoid(self.fc(diff))
 
 def weights_init(m):
 	if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
@@ -149,29 +150,70 @@ def weights_init(m):
 		if m.bias is not None:
 			init.constant_(m.bias.data,0)
 
+def confusion(output, label, tp, fp, tn, fn):
+	conf_matrix = torch.zeros(2,2)
+	for out, lab in zip(output,label):
+		conf_matrix[int(out),int(lab)] += 1
+	tp += conf_matrix[0,0]
+	fp += conf_matrix[0,1]
+	fn += conf_matrix[1,0]
+	tn += conf_matrix[1,1]
+
+	return tp,fp,tn,fn
+
+def get_AUC(pred,label):
+		P = label.sum()
+		N = len(label)-P
+		indexes = list(range(len(pred)))
+		indexes.sort(key=pred.__getitem__)
+		FP, TP, fp, tp, area = 0, 0, 0, 0, 0
+		prev = -float('inf')
+		for i in indexes:
+				if pred[i] != prev:
+						area += trap_area(FP,fp,TP,tp)
+						prev = pred[i]
+						fp = FP
+						tp = TP
+				if label[i] == 1:
+						TP += 1
+				else:
+						FP += 1
+		area += trap_area(N,fp,N,tp)
+
+		return 1-(area/(P*N))
+
+def trap_area(FP,fp,TP,tp):
+	return abs(FP-fp) * (TP+tp)/2
+
+def get_labels(ll_out, threshold):
+		pred_label = ll_out >= threshold
+		return pred_label
+
 def train(model, traine, optimizer, epoch, size):
 	model.train()
 	train_loss = 0
 	correct = 0
 	total = 0
-
 	output_dist,actual = [], []
+
 	for _ in range(size[0]):
 		batch_1 = traine.next_batch(batch_size)
 		gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
 		batch_2 = traine.next_batch(batch_size)
 		gmaker.forward(batch_2, input_tensor_2,random_translation=2.0, random_rotation=True) 
-		batch_1.extract_label(1, float_labels)
+		batch_1.extract_label(0, float_labels)
 		labels = torch.unsqueeze(float_labels,1).float().to('cuda')
 		optimizer.zero_grad()
 		output = model(input_tensor_1,input_tensor_2)
 		loss = criterion(output,labels)
+		pred_label = get_labels(output, threshold)
+		correct += (pred_label == labels).sum().item()
+		total += batch_size
 		train_loss += loss
 		loss.backward()
 		optimizer.step()
 		output_dist += output.flatten().tolist()
 		actual += labels.flatten().tolist()
-
 
    # if size[1] != 0: #make sure go through every single training example
    #	 batch_1 = traine.next_batch()
@@ -186,42 +228,49 @@ def train(model, traine, optimizer, epoch, size):
    #	 output_dist += output.flatten().tolist()
    #	 actual += labels.flatten().tolist()
 
-	r=pearsonr(np.array(actual),np.array(output_dist))
-	return train_loss/(size[2]), output_dist, r[0]
+	return train_loss/total, (correct/total), output_dist
 
 def test(model, teste, size):
 	model.eval()
 	test_loss = 0
-
+	correct = 0
+	total = 0
+	tp,fp,tn,fn = 0,0,0,0
+	tot_auc = 0
 	output_dist,actual = [],[]
+
 	with torch.no_grad():
 		for _ in range(size[0]):	
 			batch_1 = traine.next_batch(batch_size)
 			gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
 			batch_2 = traine.next_batch(batch_size)
 			gmaker.forward(batch_2, input_tensor_2,random_translation=2.0, random_rotation=True) 
-			batch_1.extract_label(1, float_labels)
+			batch_1.extract_label(0, float_labels)
 			labels = torch.unsqueeze(float_labels,1).float().to('cuda')
 			optimizer.zero_grad()
 			output = model(input_tensor_1,input_tensor_2)
 			loss = criterion(output,labels)
+
+			pred_label= get_labels(output, threshold)
+			correct += (pred_label == labels).sum().item()
+			tp,fp,tn,fn = confusion(pred_label,labels,tp,fp,tn,fn)
+			tot_auc += get_AUC(output, labels)
+			total += batch_size
 			test_loss += loss
 			output_dist += output.flatten().tolist()
 			actual += labels.flatten().tolist()
 
-	r = pearsonr(np.array(actual),np.array(output_dist))
-	return test_loss/(size[2]), output_dist,r[0]
+	return test_loss/total, (tp+tn)/(tp+fp+tn+fn), (tp)/(tp+fp), (tp)/(tp+fn), tot_auc/(total/batch_size),output_dist
 
 tgs = ['two_legged'] + args.tags
-wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
+wandb.init(entity='andmcnutt', project='DDG_model',config=args, tags=tgs)
 
 #Parameters that are not important for hyperparameter sweep
 batch_size=32
 epochs=args.epoch
+threshold=0.5
 
 print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
-
-
 
 traine = molgrid.ExampleProvider(ligmolcache=args.ligtr,recmolcache=args.rectr, balanced=True,shuffle=True, max_group_size=2, group_batch_size=batch_size)
 traine.populate(args.trainfile)
@@ -253,7 +302,7 @@ model.apply(weights_init)
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum,weight_decay=args.weightdecay)
 if args.solver=="adam":
 	optimizer=optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weightdecay)
-criterion = nn.MSELoss()
+criterion = nn.BCELoss()
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=0.00001, factor=0.5, patience=5, verbose=True)
 
 input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
@@ -272,20 +321,25 @@ if leftover_tt != 0:
 wandb.watch(model,log='all')
 
 for epoch in range(epochs):
-	tr_loss, out_dist, tr_r = train(model, traine, optimizer, epoch,tr_nums)
-	tt_loss, out_d, tt_r = test(model, teste, tt_nums)
+	tr_loss, tr_acc, out_dist =  train(model, traine, optimizer, epoch,tr_nums)
+	tt_loss, tt_acc, tt_pr, tt_rec, auc, out_d = test(model, teste, tt_nums)
 	scheduler.step(tr_loss)
 	
 	wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
 	wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
 	wandb.log({
 		"Avg Train Loss": tr_loss,
+		"Train Accuracy": tr_acc,
 		"Avg Test Loss": tt_loss,
-		"Train R": tr_r,
-		"Test R": tt_r})
-	if not epoch % 50:
-		torch.save(model.state_dict(), "model.h5")
-		wandb.save('model.h5')
+		"Test Accuracy": tt_acc,
+		"Test Precision": tt_pr,
+		"Test Recall": tt_rec,
+		"AUC": auc})
+
+	if tr_acc == 1.00:
+		print('Reached 100% train accuracy')
+		break
+
 torch.save(model.state_dict(), "model.h5")
 wandb.save('model.h5')
 print("Final Train Distribution: Mean={:.4f}, Var={:.4f}".format(np.mean(out_dist),np.var(out_dist)))
