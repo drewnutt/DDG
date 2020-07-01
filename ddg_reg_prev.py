@@ -159,12 +159,10 @@ def train(model, traine, optimizer, epoch, size):
 	for _ in range(size[0]):
 		batch_1 = traine.next_batch(batch_size)
 		gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
-		batch_2 = traine.next_batch(batch_size)
-		gmaker.forward(batch_2, input_tensor_2,random_translation=2.0, random_rotation=True) 
 		batch_1.extract_label(1, float_labels)
 		labels = torch.unsqueeze(float_labels,1).float().to('cuda')
 		optimizer.zero_grad()
-		output = model(input_tensor_1,input_tensor_2)
+		output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
 		loss = criterion(output,labels)
 		train_loss += loss
 		loss.backward()
@@ -196,14 +194,12 @@ def test(model, teste, size):
 	output_dist,actual = [],[]
 	with torch.no_grad():
 		for _ in range(size[0]):	
-			batch_1 = traine.next_batch(batch_size)
+			batch_1 = teste.next_batch(batch_size)
 			gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
-			batch_2 = traine.next_batch(batch_size)
-			gmaker.forward(batch_2, input_tensor_2,random_translation=2.0, random_rotation=True) 
 			batch_1.extract_label(1, float_labels)
 			labels = torch.unsqueeze(float_labels,1).float().to('cuda')
 			optimizer.zero_grad()
-			output = model(input_tensor_1,input_tensor_2)
+			output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
 			loss = criterion(output,labels)
 			test_loss += loss
 			output_dist += output.flatten().tolist()
@@ -223,9 +219,9 @@ print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
 
 
 
-traine = molgrid.ExampleProvider(ligmolcache=args.ligtr,recmolcache=args.rectr, balanced=True,shuffle=True, max_group_size=2, group_batch_size=batch_size)
+traine = molgrid.ExampleProvider(ligmolcache=args.ligtr,recmolcache=args.rectr, balanced=True,shuffle=True, duplicate_first=True)
 traine.populate(args.trainfile)
-teste = molgrid.ExampleProvider(ligmolcache=args.ligte,recmolcache=args.recte,shuffle=True, max_group_size=2, group_batch_size=batch_size)
+teste = molgrid.ExampleProvider(ligmolcache=args.ligte,recmolcache=args.recte,shuffle=True, duplicate_first=True)
 teste.populate(args.testfile)
 
 trsize = traine.size()
@@ -236,12 +232,13 @@ one_e_tt = int(tssize/batch_size)
 leftover_tt = tssize % batch_size
 
 gmaker = molgrid.GridMaker()
-dims = gmaker.grid_dimensions(14*2) #only one rec+onelig per example
+dims = gmaker.grid_dimensions(14*4) #only one rec+onelig per example
 tensor_shape = (batch_size,)+dims
 tr_nums=(one_e_tr,leftover_tr,trsize)
 tt_nums=(one_e_tt,leftover_tt, tssize)
 
-model = Net(dims)
+actual_dims = (dims[0]//2, *dims[1:])
+model = Net(actual_dims)
 if torch.cuda.device_count() > 1:
 	print("Using {} GPUs".format(torch.cuda.device_count()))
 	model = nn.DataParallel(model)
