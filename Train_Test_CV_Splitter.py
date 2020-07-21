@@ -69,6 +69,7 @@ np.random.seed(args.seed)
 train_data = pd.read_csv(args.input, delimiter=' ', header=None)
 train_data.columns = ['label','reglabel','og', 'lig1','lig2']
 train_data['recs'] = train_data['og'].astype(str).str[:4]
+train_data = train_data.replace([np.inf,-np.inf],np.nan).dropna()
 #train_data['rec'] = pd.Series(train_data.apply(lambda x: re.match(x,rec_of_row)[0],axis=1), index=train_data.index)
 #pdb_to_ind = dict()
 #for pdb in list_of_pdbs:
