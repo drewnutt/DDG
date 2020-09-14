@@ -1,0 +1,33 @@
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
+method: bayes
+metric:
+  goal: maximize
+  name: Train R
+parameters:
+  trainfile:
+    value: "CV_Sets/mol_sdfo_train_papersplit_5_ob.types"
+  testfile:
+    value: "CV_Sets/mol_sdfo_test_papersplit_5_ob.types"
+  dropout:
+    distribution: uniform
+    max: 1
+    min: 0
+  lr:
+    distribution: uniform
+    max: 0.05
+    min: 0.00001
+  solver:
+    value: "adam"
+  batch_norm:
+    values:
+      - 0
+      - 1
+  epoch:
+    value: 200
+  tags:
+    value: "addnl_ligs_5 paper_emu VectorTyper BatchNorm"
+program: reg_emu_paper.py 
