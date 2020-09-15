@@ -24,12 +24,14 @@ parser.add_argument('--recte', help='location of testing receptor cache file inp
 parser.add_argument('--testfile', required=True, help='location of testing information, this must have a group indicator')
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
+parser.add_argument('--non_lin',choices=['relu','leakyrelu'],default='relu',help='non-linearity to use in the network')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
 parser.add_argument('--solver', default="sgd", choices=('adam','sgd'), type=str, help="solver to use")
 parser.add_argument('--epoch',default=200,type=int,help='number of epochs to train for (default %(default)d)')
 parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb run')
 parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use batch normalization during the training process')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
+parser.add_argument('--extra_stats',default=False,action='store_true',help='keep statistics about per receptor R values') 
 args = parser.parse_args()
 
 class View(nn.Module):
@@ -48,7 +50,9 @@ class Net(nn.Module):
                 ksize = 3
 
                 #select activation function
-                func = F.relu
+                self.func = F.relu
+                if args.non_lin != 'relu':
+                    self.func = F.leaky_relu
                 if args.batch_norm:
                     self.bn1=nn.BatchNorm3d(32)
                     self.bn2=nn.BatchNorm3d(32)
@@ -69,16 +73,16 @@ class Net(nn.Module):
         def forward_one(self, x): #should approximate the affinity of the receptor/ligand pair
                 if self.bn1 is not None:
                     x= self.bn1(self.conv1(x))
-                    x= self.bn2(self.conv2(F.relu(x)))
-                    x=self.max1(F.relu(x))
+                    x= self.bn2(self.conv2(self.func(x)))
+                    x=self.max1(self.func(x))
 
-                    x= F.relu(self.bn3(self.conv3(x)))
+                    x= self.func(self.bn3(self.conv3(x)))
                 else:
                     x= self.conv1(x)
-                    x= self.conv2(F.relu(x))
-                    x=self.max1(F.relu(x))
+                    x= self.conv2(self.func(x))
+                    x=self.max1(self.func(x))
 
-                    x= F.relu(self.conv3(x))
+                    x= self.func(self.conv3(x))
 
                 x= x.view(x.shape[0], -1)       
                 return x
@@ -146,8 +150,10 @@ def test(model, test_data, size, test_recs_split):
 
         # Calculating "Average" Pearson's R across each receptor
         last_val,r_ave= 0,0
-        for test_count in test_recs_split:
+        r_per_rec = dict()
+        for test_rec, test_count in test_recs_split.items():
             r_rec, _ = pearsonr(np.array(actual[last_val:last_val+test_count]),np.array(output_dist[last_val:last_val+test_count]))
+            r_per_rec[test_rec]=r_rec
             r_ave += r_rec
             last_val += test_count
         r_ave /= len(test_recs_split)
@@ -158,7 +164,7 @@ def test(model, test_data, size, test_recs_split):
             print('{}:{}'.format(epoch,e))
             r=[np.nan,np.nan]
         rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-        return test_loss/(size[2]), output_dist,r[0],rmse,actual,r_ave
+        return test_loss/(size[2]), output_dist,r[0],rmse,actual,r_ave,r_per_rec
 
 tgs = ['two_legged'] + args.tags
 wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
@@ -176,7 +182,7 @@ traine.populate(args.trainfile)
 teste = molgrid.ExampleProvider(molgrid.GninaVectorTyper(),shuffle=True, duplicate_first=True,data_root='separated_sets/')
 teste.populate(args.testfile)
 # To compute the "average" pearson R per receptor, count the number of pairs for each rec then iterate over that number later during test time
-test_exs_per_rec=list()
+test_exs_per_rec=dict()
 with open(args.testfile) as test_types:
 	count=0
 	rec=''
@@ -184,10 +190,10 @@ with open(args.testfile) as test_types:
 		line_args = line.split(' ')
 		newrec = re.findall(r'([A-Z0-9]{4})/',line_args[2])[0]
 		if newrec != rec:
-			rec = newrec
 			if count > 0:
-				test_exs_per_rec.append(count)
+				test_exs_per_rec[rec] = count
 				count = 1
+			rec = newrec
 		else:
 			count += 1
 
@@ -236,14 +242,14 @@ if leftover_tt != 0:
 wandb.watch(model,log='all')
 
 for epoch in range(1,epochs+1):
-        fig = plt.figure()
         tr_loss, out_dist, tr_r, tr_rmse,tr_act = train(model, traine, optimizer, epoch,tr_nums)
-        tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave = test(model, teste, tt_nums, test_exs_per_rec)
+        tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste, tt_nums, test_exs_per_rec)
         scheduler.step(tr_loss)
         
         wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
         wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
         if epoch % 10 == 0: # only log the graphs every 10 epochs, make things a bit faster
+            fig = plt.figure()
             plt.scatter(tr_act,out_dist)
             plt.xlabel('Actual DDG')
             plt.ylabel('Predicted DDG')
@@ -253,6 +259,19 @@ for epoch in range(1,epochs+1):
             plt.xlabel('Actual DDG')
             plt.ylabel('Predicted DDG')
             wandb.log({"Actual vs. Predicted DDG (Test)": fig}, commit=False)
+            fig.clf()
+            if args.extra_stats:
+                lists = sorted(tt_r_per_rec)
+                recs, rvals = zip(*lists)
+                plt.bar(list(range(len(vals))),vals,tick_label=recs)
+                wandb.log({"R Value Per Receptor (Test)": fig},commit=False)
+                fig.clf()
+                sorted_num_ligs = sorted(test_exs_per_rec)
+                _, num_ligs = zip(*sorted_num_ligs)
+                plt.scatter(num_ligs,rvals)
+                wandb.log({"R Value Per Num_Ligs (Test)": fig},commit=False)
+
+
         wandb.log({
             "Avg Train Loss": tr_loss,
             "Avg Test Loss": tt_loss,
