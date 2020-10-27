@@ -1,3 +1,4 @@
+import re
 import molgrid
 import numpy as np
 import torch
@@ -6,14 +7,11 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn import init
 from torch import autograd
-import os,re
 import wandb
 import argparse
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-
-from paper_model import Net
 
 mpl.use('Agg')
 
@@ -35,7 +33,13 @@ parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use ba
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
 parser.add_argument('--extra_stats',default=False,action='store_true',help='keep statistics about per receptor R values') 
+parser.add_argument('--use_model','-m',default='paper',choices=['paper','default2018'],help='Network architecture to use')
 args = parser.parse_args()
+
+if  args.use_model == 'paper':
+    from paper_model import Net
+elif args.use_model == 'default2018':
+    from default2018_model import Net
 
 def weights_init(m):
         if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
