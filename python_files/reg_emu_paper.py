@@ -13,6 +13,8 @@ from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+from paper_model import Net
+
 mpl.use('Agg')
 
 parser = argparse.ArgumentParser()
@@ -31,67 +33,9 @@ parser.add_argument('--epoch',default=200,type=int,help='number of epochs to tra
 parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb run')
 parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use batch normalization during the training process')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
+parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
 parser.add_argument('--extra_stats',default=False,action='store_true',help='keep statistics about per receptor R values') 
 args = parser.parse_args()
-
-class View(nn.Module):
-        def __init__(self,shape):
-                super(View, self).__init__()
-                self.shape = shape
-        def forward(self, input):
-                return input.view(*self.shape)
-
-class Net(nn.Module):
-        def __init__(self, dims):
-                super(Net, self).__init__()
-                self.modules = []
-                self.residuals = []
-                nchannels = dims[0]
-                ksize = 3
-
-                #select activation function
-                self.func = F.relu
-                if args.non_lin != 'relu':
-                    self.func = F.leaky_relu
-                if args.batch_norm:
-                    self.bn1=nn.BatchNorm3d(32)
-                    self.bn2=nn.BatchNorm3d(32)
-                    self.bn3=nn.BatchNorm3d(3)
-                else:
-                    self.bn1 = None
-                
-
-                self.conv1 = nn.Conv3d(nchannels, 32, kernel_size=ksize)
-                self.conv2 = nn.Conv3d(32,32,kernel_size=ksize)
-                self.max1 = nn.MaxPool3d(3)
-                
-                self.conv3 = nn.Conv3d(32,3,kernel_size=ksize)
-                self.lin1 = nn.Linear(5184,1,bias=False)
-                self.dp1 = nn.Dropout(p=args.dropout)
-
-
-        def forward_one(self, x): #should approximate the affinity of the receptor/ligand pair
-                if self.bn1 is not None:
-                    x= self.bn1(self.conv1(x))
-                    x= self.bn2(self.conv2(self.func(x)))
-                    x=self.max1(self.func(x))
-
-                    x= self.func(self.bn3(self.conv3(x)))
-                else:
-                    x= self.conv1(x)
-                    x= self.conv2(self.func(x))
-                    x=self.max1(self.func(x))
-
-                    x= self.func(self.conv3(x))
-
-                x= x.view(x.shape[0], -1)       
-                return x
-
-        def forward(self,x1,x2):
-                lig1 = self.forward_one(x1)
-                lig2 = self.forward_one(x2)
-                diff = self.dp1(lig1 - lig2)
-                return self.lin1(diff)
 
 def weights_init(m):
         if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
@@ -204,14 +148,14 @@ leftover_tr = trsize % batch_size
 one_e_tt = int(tssize/batch_size)
 leftover_tt = tssize % batch_size
 
-gmaker = molgrid.GridMaker()
+gmaker = molgrid.GridMaker(binary=args.binary_rep)
 dims = gmaker.grid_dimensions(molgrid.GninaVectorTyper().num_types()*4) #only one rec+onelig per example
 tensor_shape = (batch_size,)+dims
 tr_nums=(one_e_tr,leftover_tr,trsize)
 tt_nums=(one_e_tt,leftover_tt, tssize)
 
 actual_dims = (dims[0]//2, *dims[1:])
-model = Net(actual_dims)
+model = Net(actual_dims,args)
 if torch.cuda.device_count() > 1:
         print("Using {} GPUs".format(torch.cuda.device_count()))
         model = nn.DataParallel(model)
@@ -264,15 +208,18 @@ for epoch in range(1,epochs+1):
             if args.extra_stats:
                 rperr_fig = plt.figure(3)
                 rperr_fig.clf()
-                lists = sorted(tt_r_per_rec)
-                rec_pdbs, rvals = zip(*lists)
-                plt.bar(list(range(len(vals))),vals,tick_label=rec_pdbs)
+                sorted_test_rperrec = dict(sorted(tt_r_per_rec.items(), key=lambda item: item[0]))
+                rec_pdbs, rvals = list(sorted_test_rperrec.keys()),list(sorted_test_rperrec.values())
+                plt.bar(list(range(len(rvals))),rvals,tick_label=rec_pdbs)
+                plt.ylabel("Pearson's R value")
                 wandb.log({"R Value Per Receptor (Test)": rperr_fig},commit=False)
-                rvsnligs_fig=plt.figure(3)
+                rvsnligs_fig=plt.figure(4)
                 rvsnligs_fig.clf()
-                sorted_num_ligs = sorted(test_exs_per_rec)
-                _, num_ligs = zip(*sorted_num_ligs)
+                sorted_num_ligs = dict(sorted(test_exs_per_rec.items(),key=lambda item: item[0]))
+                num_ligs = list(sorted_num_ligs.values())
                 plt.scatter(num_ligs,rvals)
+                plt.xlabel('number of ligands (test)')
+                plt.ylabel("Pearson's R")
                 wandb.log({"R Value Per Num_Ligs (Test)": rvsnligs_fig},commit=False)
 
 
