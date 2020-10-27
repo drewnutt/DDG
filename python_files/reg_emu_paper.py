@@ -240,7 +240,7 @@ if leftover_tt != 0:
         tt_l_labels = torch.zeros(leftover_tt, dtype=torch.float32)
 
 wandb.watch(model,log='all')
-
+print('extra stats:{}'.format(args.extra_stats))
 for epoch in range(1,epochs+1):
         tr_loss, out_dist, tr_r, tr_rmse,tr_act = train(model, traine, optimizer, epoch,tr_nums)
         tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste, tt_nums, test_exs_per_rec)
@@ -249,27 +249,31 @@ for epoch in range(1,epochs+1):
         wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
         wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
         if epoch % 10 == 0: # only log the graphs every 10 epochs, make things a bit faster
-            fig = plt.figure()
+            fig = plt.figure(1)
+            fig.clf()
             plt.scatter(tr_act,out_dist)
             plt.xlabel('Actual DDG')
             plt.ylabel('Predicted DDG')
             wandb.log({"Actual vs. Predicted DDG (Train)": fig}, commit=False)
-            fig.clf()
+            test_fig = plt.figure(2)
+            test_fig.clf()
             plt.scatter(tt_act,out_d)
             plt.xlabel('Actual DDG')
             plt.ylabel('Predicted DDG')
-            wandb.log({"Actual vs. Predicted DDG (Test)": fig}, commit=False)
-            fig.clf()
+            wandb.log({"Actual vs. Predicted DDG (Test)": test_fig}, commit=False)
             if args.extra_stats:
+                rperr_fig = plt.figure(3)
+                rperr_fig.clf()
                 lists = sorted(tt_r_per_rec)
-                recs, rvals = zip(*lists)
-                plt.bar(list(range(len(vals))),vals,tick_label=recs)
-                wandb.log({"R Value Per Receptor (Test)": fig},commit=False)
-                fig.clf()
+                rec_pdbs, rvals = zip(*lists)
+                plt.bar(list(range(len(vals))),vals,tick_label=rec_pdbs)
+                wandb.log({"R Value Per Receptor (Test)": rperr_fig},commit=False)
+                rvsnligs_fig=plt.figure(3)
+                rvsnligs_fig.clf()
                 sorted_num_ligs = sorted(test_exs_per_rec)
                 _, num_ligs = zip(*sorted_num_ligs)
                 plt.scatter(num_ligs,rvals)
-                wandb.log({"R Value Per Num_Ligs (Test)": fig},commit=False)
+                wandb.log({"R Value Per Num_Ligs (Test)": rvsnligs_fig},commit=False)
 
 
         wandb.log({
