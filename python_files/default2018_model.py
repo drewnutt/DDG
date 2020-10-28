@@ -1,14 +1,21 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+class View(nn.Module):
+        def __init__(self,shape):
+                super(View, self).__init__()
+                self.shape = shape
+        def forward(self, input):
+                return input.view(*self.shape)
+
 class Net(nn.Module):
-        def __init__(self, dims):
+        def __init__(self, dims,config):
                 super(Net, self).__init__()
                 self.modules = []
                 nchannels = dims[0]
 
                 self.func = F.relu
-                self.dropout = nn.Dropout(p=args.dropout)
+                self.dropout = nn.Dropout(p=config.dropout)
 
                 avgpool1 = nn.AvgPool3d(2,stride=2)
                 self.add_module('avgpool_0', avgpool1)
