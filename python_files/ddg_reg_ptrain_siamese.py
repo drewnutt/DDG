@@ -34,10 +34,11 @@ parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to 
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
 parser.add_argument('--extra_stats',default=False,action='store_true',help='keep statistics about per receptor R values') 
-parser.add_argument('--use_model','-m',default='paper',choices=['paper','default2018','extend_default2018'],help='Network architecture to use')
+parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'default2018', 'extend_default2018', 'multtask_default2018'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=128,type=int,help='size of fully connected layer before subtraction in latent space')
+parser.add_argument('--absolute_dg_loss', '-L',action='store_true',default=False,help='use a loss function (and model architecture) that utilizes the absolute binding affinity')
 args = parser.parse_args()
 
 if  args.use_model == 'paper':
@@ -46,79 +47,99 @@ elif args.use_model == 'default2018':
     from default2018_model import Net
 elif args.use_model == 'extend_default2018':
     from extended_default2018_model import Net
+elif args.use_model == 'multtask_default2018':
+    from multtask_default2018_model import Net
 
 def weights_init(m):
-        if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                init.xavier_uniform_(m.weight.data)
-                if m.bias is not None:
-                        init.constant_(m.bias.data,0)
+    if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+        init.xavier_uniform_(m.weight.data)
+        if m.bias is not None:
+            init.constant_(m.bias.data,0)
 
 def train(model, traine, optimizer, epoch, size):
-        model.train()
-        train_loss = 0
-        correct = 0
-        total = 0
+    model.train()
+    train_loss = 0
 
-        output_dist,actual = [], []
-        for _ in range(size[0]):
-                batch_1 = traine.next_batch(batch_size)
-                gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
-                batch_1.extract_label(1, float_labels)
-                labels = torch.unsqueeze(float_labels,1).float().to('cuda')
-                optimizer.zero_grad()
-                output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
-                loss = criterion(output,labels)
-                train_loss += loss
-                loss.backward()
-                if args.clip > 0:
-                    nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-                optimizer.step()
-                output_dist += output.flatten().tolist()
-                actual += labels.flatten().tolist()
+    output_dist,actual = [], []
+    for _ in range(size[0]):
+        batch_1 = traine.next_batch(batch_size)
+        gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
+        batch_1.extract_label(1, float_labels)
+        labels = torch.unsqueeze(float_labels,1).float().to('cuda')
+        optimizer.zero_grad()
+        if args.absolute_dg_loss:
+            batch_1.extract_label(2, lig1_label)
+            batch_1.extract_label(2, lig2_label)
+            output, lig1, lig2 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
+            loss_lig1 = criterion_lig1(lig1,lig1_label)
+            loss_lig2 = criterion_lig2(lig2,lig2_label)
+            ddg_loss = criterion(output,labels)
+            loss = loss_lig1 + loss_lig2 + ddg_loss
+        else:
+            output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
+            loss = criterion(output,labels)
+        train_loss += loss
+        loss.backward()
+        if args.clip > 0:
+            nn.utils.clip_grad_norm_(model.parameters(),args.clip)
+        optimizer.step()
+        output_dist += output.flatten().tolist()
+        actual += labels.flatten().tolist()
 
-        try:
-            r=pearsonr(np.array(actual),np.array(output_dist))
-        except ValueError as e:
-            print('{}:{}'.format(epoch,e))
-            r=[np.nan,np.nan]
-        rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-        return train_loss/(size[2]), output_dist, r[0], rmse,actual
+    try:
+        r=pearsonr(np.array(actual),np.array(output_dist))
+    except ValueError as e:
+        print('{}:{}'.format(epoch,e))
+        r=[np.nan,np.nan]
+    rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
+    return train_loss/(size[2]), output_dist, r[0], rmse,actual
 
 def test(model, test_data, size, test_recs_split):
-        model.eval()
-        test_loss = 0
+    model.eval()
+    test_loss = 0
 
-        output_dist,actual = [],[]
-        with torch.no_grad():
-                for _ in range(size[0]):        
-                        batch_1 = test_data.next_batch(batch_size)
-                        gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
-                        batch_1.extract_label(1, float_labels)
-                        labels = torch.unsqueeze(float_labels,1).float().to('cuda')
-                        optimizer.zero_grad()
-                        output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
-                        loss = criterion(output,labels)
-                        test_loss += loss
-                        output_dist += output.flatten().tolist()
-                        actual += labels.flatten().tolist()
+    output_dist,actual = [],[]
+    with torch.no_grad():
+        for _ in range(size[0]):        
+            batch_1 = test_data.next_batch(batch_size)
+            gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
+            batch_1.extract_label(1, float_labels)
+            labels = torch.unsqueeze(float_labels,1).float().to('cuda')
+            optimizer.zero_grad()
+            if args.absolute_dg_loss:
+                batch_1.extract_label(2, lig1_label)
+                batch_1.extract_label(2, lig2_label)
+                lig1_labels = torch.unsqueeze(lig1_label,1).float().to('cuda')
+                lig2_labels = torch.unsqueeze(lig2_label,1).float().to('cuda')
+                output,lig1,lig2 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
+                loss_lig1 = criterion_lig1(lig1,lig1_labels)
+                loss_lig2 = criterion_lig1(lig2,lig2_labels)
+                ddg_loss = criterion(output,labels)
+                loss = loss_lig1 + loss_lig2 + ddg_loss
+            else:
+                output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
+                loss = criterion(output,labels)
+            test_loss += loss
+            output_dist += output.flatten().tolist()
+            actual += labels.flatten().tolist()
 
-        # Calculating "Average" Pearson's R across each receptor
-        last_val,r_ave= 0,0
-        r_per_rec = dict()
-        for test_rec, test_count in test_recs_split.items():
-            r_rec, _ = pearsonr(np.array(actual[last_val:last_val+test_count]),np.array(output_dist[last_val:last_val+test_count]))
-            r_per_rec[test_rec]=r_rec
-            r_ave += r_rec
-            last_val += test_count
-        r_ave /= len(test_recs_split)
+    # Calculating "Average" Pearson's R across each receptor
+    last_val,r_ave= 0,0
+    r_per_rec = dict()
+    for test_rec, test_count in test_recs_split.items():
+        r_rec, _ = pearsonr(np.array(actual[last_val:last_val+test_count]),np.array(output_dist[last_val:last_val+test_count]))
+        r_per_rec[test_rec]=r_rec
+        r_ave += r_rec
+        last_val += test_count
+    r_ave /= len(test_recs_split)
 
-        try:
-            r=pearsonr(np.array(actual),np.array(output_dist))
-        except ValueError as e:
-            print('{}:{}'.format(epoch,e))
-            r=[np.nan,np.nan]
-        rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-        return test_loss/(size[2]), output_dist,r[0],rmse,actual,r_ave,r_per_rec
+    try:
+        r=pearsonr(np.array(actual),np.array(output_dist))
+    except ValueError as e:
+        print('{}:{}'.format(epoch,e))
+        r=[np.nan,np.nan]
+    rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
+    return test_loss/(size[2]), output_dist,r[0],rmse,actual,r_ave,r_per_rec
 
 tgs = ['two_legged'] + args.tags
 wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
@@ -138,18 +159,18 @@ teste.populate(args.testfile)
 # To compute the "average" pearson R per receptor, count the number of pairs for each rec then iterate over that number later during test time
 test_exs_per_rec=dict()
 with open(args.testfile) as test_types:
-	count=0
-	rec=''
-	for line in test_types:
-		line_args = line.split(' ')
-		newrec = re.findall(r'([A-Z0-9]{4})/',line_args[2])[0]
-		if newrec != rec:
-			if count > 0:
-				test_exs_per_rec[rec] = count
-				count = 1
-			rec = newrec
-		else:
-			count += 1
+    count = 0
+    rec = ''
+    for line in test_types:
+        line_args = line.split(' ')
+        newrec = re.findall(r'([A-Z0-9]{4})/',line_args[2])[0]
+        if newrec != rec:
+            if count > 0:
+                test_exs_per_rec[rec] = count
+                count = 1
+            rec = newrec
+        else:
+            count += 1
 
 trsize = traine.size()
 tssize = teste.size()
@@ -192,11 +213,19 @@ optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_d
 if args.solver=="adam":
         optimizer=optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 criterion = nn.MSELoss()
+if args.absolute_dg_loss(): # Note these are the same loss functions as the main one, so in production these could jsut use the same, but this allows for different loss functions
+    criterion_lig1 = nn.MSELoss()
+    criterion_lig2 = nn.MSELoss()
+
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=0.001, verbose=True)
 
 input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 input_tensor_2 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 float_labels = torch.zeros(batch_size, dtype=torch.float32)
+if args.absolute_dg_loss:
+    lig1_label = torch.zeros(batch_size, dtype=torch.float32)
+    lig2_label = torch.zeros(batch_size, dtype=torch.float32)
+
 
 if leftover_tr != 0:
         tr_leftover_shape = (leftover_tr,) + dims
