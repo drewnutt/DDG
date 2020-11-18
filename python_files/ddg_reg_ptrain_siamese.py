@@ -39,16 +39,22 @@ parser.add_argument('--use_weights','-w',help='pretrained weights to use for the
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=128,type=int,help='size of fully connected layer before subtraction in latent space')
 parser.add_argument('--absolute_dg_loss', '-L',action='store_true',default=False,help='use a loss function (and model architecture) that utilizes the absolute binding affinity')
+parser.add_argument('--consistency_term','-C',action='store_true',default=False,help='Use a consistency term in the multitask loss function to ensure absolute affinities agree with the relative binding affinities')
 args = parser.parse_args()
+
+assert args.absolute_dg_loss and args.use_model in ['multtask_def2018', 'ext_mult_def2018'], 'Cannot have multitask loss with a non-multitask model'
+assert not args.absolute_dg_loss and args.use_model not in ['multtask_def2018', 'ext_mult_def2018'], 'Cannot have multitask model with a non-multitask loss'
 
 if  args.use_model == 'paper':
     from paper_model import Net
-elif args.use_model == 'default2018':
+elif args.use_model == 'def2018':
     from default2018_model import Net
-elif args.use_model == 'extend_default2018':
+elif args.use_model == 'extend_def2018':
     from extended_default2018_model import Net
-elif args.use_model == 'multtask_default2018':
-    from multtask_default2018_model import Net
+elif args.use_model == 'multtask_def2018':
+    from multtask_def2018_model import Net
+elif args.use_model == 'ext_mult_default2018':
+    from extended_multtask_def2018_model import Net
 
 def weights_init(m):
     if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
@@ -69,12 +75,14 @@ def train(model, traine, optimizer, epoch, size):
         optimizer.zero_grad()
         if args.absolute_dg_loss:
             batch_1.extract_label(2, lig1_label)
-            batch_1.extract_label(2, lig2_label)
+            batch_1.extract_label(3, lig2_label)
+            lig1_labels = torch.unsqueeze(lig1_label,1).float().to('cuda')
+            lig2_labels = torch.unsqueeze(lig2_label,1).float().to('cuda')
             output, lig1, lig2 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
-            loss_lig1 = criterion_lig1(lig1,lig1_label)
-            loss_lig2 = criterion_lig2(lig2,lig2_label)
+            loss_lig1 = criterion_lig1(lig1,lig1_labels)
+            loss_lig2 = criterion_lig2(lig2,lig2_labels)
             ddg_loss = criterion(output,labels)
-            loss = loss_lig1 + loss_lig2 + ddg_loss
+            loss = loss_lig1 + loss_lig2 + ddg_loss + int(args.consistency_term) * criterion((lig1-lig2),output)
         else:
             output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
             loss = criterion(output,labels)
@@ -108,14 +116,14 @@ def test(model, test_data, size, test_recs_split):
             optimizer.zero_grad()
             if args.absolute_dg_loss:
                 batch_1.extract_label(2, lig1_label)
-                batch_1.extract_label(2, lig2_label)
+                batch_1.extract_label(3, lig2_label)
                 lig1_labels = torch.unsqueeze(lig1_label,1).float().to('cuda')
                 lig2_labels = torch.unsqueeze(lig2_label,1).float().to('cuda')
                 output,lig1,lig2 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
                 loss_lig1 = criterion_lig1(lig1,lig1_labels)
-                loss_lig2 = criterion_lig1(lig2,lig2_labels)
+                loss_lig2 = criterion_lig2(lig2,lig2_labels)
                 ddg_loss = criterion(output,labels)
-                loss = loss_lig1 + loss_lig2 + ddg_loss
+                loss = loss_lig1 + loss_lig2 + ddg_loss + int(args.consistency_term) * criterion((lig1-lig2),output)
             else:
                 output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
                 loss = criterion(output,labels)
@@ -163,7 +171,7 @@ with open(args.testfile) as test_types:
     rec = ''
     for line in test_types:
         line_args = line.split(' ')
-        newrec = re.findall(r'([A-Z0-9]{4})/',line_args[2])[0]
+        newrec = re.findall(r'([A-Z0-9]{4})/',line_args[4])[0]
         if newrec != rec:
             if count > 0:
                 test_exs_per_rec[rec] = count
@@ -213,7 +221,7 @@ optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_d
 if args.solver=="adam":
         optimizer=optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 criterion = nn.MSELoss()
-if args.absolute_dg_loss(): # Note these are the same loss functions as the main one, so in production these could jsut use the same, but this allows for different loss functions
+if args.absolute_dg_loss: # Note these are the same loss functions as the main one, so in production these could jsut use the same, but this allows for different loss functions
     criterion_lig1 = nn.MSELoss()
     criterion_lig2 = nn.MSELoss()
 
