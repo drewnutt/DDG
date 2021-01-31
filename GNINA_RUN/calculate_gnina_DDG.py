@@ -6,111 +6,111 @@ from itertools import permutations
 import os
 import sys
 import numpy as np
+from scipy.stats import pearsonr
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 
-class Ligand():
-    def __init__(self,name,caff,score,aff):
-        self.name=name
-        self.aff=aff
-        self.score=score
-        self.caff=caff
-    def get_ligand(self):
-        return "{} {} {} {}\n".format(self.name,self.caff,self.score,self.aff)
+mpl.use('Agg')
 
 parser= argparse.ArgumentParser()
-parser.add_argument('-gf', required=True, help='file containing condensed gnina output')
-parser.add_argument('--trainf', required=True, help='training input file for DDG model')
-parser.add_argument('--vina', action='store_true', help='report classification using Vina affinity')
-parser.add_argument('--model', help='gnina model used to calculate info')
-parser.add_argument('--cv_set', action='store_true', help='check accuracy on subset of all data')
+parser.add_argument('-gf', help='gnina run file')
+parser.add_argument('--trainf',nargs='+',default=[], help='training input file for DDG model')
+parser.add_argument('--model',required=True, help='gnina model used to calculate info')
+parser.add_argument('--pre_compiled',action='store_true',default=False,help='all of the gnina information is compiled, just compare to Ground Truth Files')
 args = parser.parse_args()
 
-ligand_list = []
-name_p = re.compile('(?:/)([A-Z0-9]+)(?:\.mol2)')
-with open(args.gf, 'r') as f:
-    name = ''
-    aff, caff, score=0,0,0
-    for idx, line in enumerate(f):
-        vals = line.split()
-        if idx%5==0:
-            name = re.findall(name_p,vals[4])[0]
-        if idx%5==1:
-            aff = vals[1]
-        if idx%5==2:
-            score= vals[1]
-        if idx%5==3:
-            caff= vals[1]
-        if idx%5==4:
-            ligand_list.append(Ligand(name,caff,score,aff))
-ligand_list.sort(key=lambda x: x.name)
-gnina_df = 'GNINA_RUN/gnina_out_{}.txt'.format(args.model)
-with open(gnina_df,'w') as df:
-    for lig in ligand_list:
-        df.write(lig.get_ligand())
-del ligand_list
+print((not args.pre_compiled and args.gf is not None))
+print(args.pre_compiled and os.path.isfile(f'/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/gnina_DDG_{args.model}.txt'))
+assert (not args.pre_compiled and args.gf is not None) or (args.pre_compiled and os.path.isfile(f'/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/gnina_DDG_{args.model}.txt')), 'Need gnina run file if you dont have precompiled DDG file for the given model'
 
-full_list = pd.DataFrame()
-affinity = pd.read_csv(gnina_df, sep=' ', header=None, names=['name','gnina_aff','score','vaff'], dtype={'name':str,'gnina_aff':np.float64,'score':np.float64,'vaff':np.float64})
-rec = affinity['name'].str[:4].unique().tolist()
-rec_list = affinity['name'].str[:4].tolist()
-rec.sort()
-length = len(rec)
-list_of_data = []
-for i,r in enumerate(rec):
-    is_rec = pd.Series([item==r for item in rec_list])
-    affinity = affinity.assign(is_rec = is_rec.values)
-    rec_affinity = affinity[affinity.is_rec == 1]
-    rec_affinity.set_index('name', inplace=True)
-    ligdict = {}
-    ligs = os.listdir(path='separated_sets/'+ r+'/')
-    ligs= [item[:6] for item in ligs if '.mol2' in item and '_' not in item]
-    if len(ligs) < 2:
-        continue;
-    ligs.sort()
-    lig_perms = permutations(ligs,2)
-    for lig1,lig2 in lig_perms:
-        try:
-            labelgaff = int(rec_affinity.at[lig1,'gnina_aff'] < rec_affinity.at[lig2,'gnina_aff']) #1 if 2nd ligand has higher affinity(0 if 1st ligand has higher affinity)
-            labelscr = int(rec_affinity.at[lig1,'score'] < rec_affinity.at[lig2,'score'])
-            labelv = int(rec_affinity.at[lig1,'vaff'] > rec_affinity.at[lig2,'vaff'])
-            diffgaff = rec_affinity.at[lig1,'gnina_aff'] - rec_affinity.at[lig2,'gnina_aff']
-            diffscore = rec_affinity.at[lig1,'score'] - rec_affinity.at[lig2,'score']
-            diffv = rec_affinity.at[lig1,'vaff'] - rec_affinity.at[lig2,'vaff']
-            info = [labelgaff, diffgaff, labelscr, diffscore, labelv, diffv, lig1,lig2]
-            list_of_data.append(info)
-        except Exception as e:
-            print(r,lig1,lig2, e)
-    affinity.drop('is_rec', axis=1, inplace=True)
-    if i%(length/10) == 0:
-        print(i/(length/10))
-output = pd.DataFrame(list_of_data)
-output.columns = ['l_gnina_aff', 'd_gnina_aff', 'l_scr', 'd_scr', 'l_vina_aff','d_vina_aff', 'lig1', 'lig2']
-gnina_ddg = 'GNINA_RUN/gnina_DDG_{}.txt'.format(args.model)
-output.to_csv(gnina_ddg, sep=' ', index=False)
+def makeGninaDDGFile():
+    ## first compile all of the ligand affinities computed by gnina
+    ligand_list = []
+    name_p = re.compile('(?:/)([A-Z0-9]+)(?:\.mol2)')
+    logfiles=[]
+    with open(args.gf, 'r') as f:
+        for line in f:
+            logfiles.append(line.split(' ')[-1].strip())
 
-train_data = pd.read_csv(args.trainf, sep=' ', header=None, names=['label','diff','lig1','lig2'], usecols=[0,1,3,4], dtype={'label':np.int32,'diff':np.float64})
-ligname_pattern = re.compile('(?:/)(......)(?:_.\.gninatypes)')
-recname_pattern = re.compile('(....)')
-train_data['lig2'] = train_data['lig2'].apply(lambda x: re.findall(ligname_pattern,x)[0])
-train_data['lig1'] = train_data['lig1'].apply(lambda x: re.findall(ligname_pattern,x)[0])
-outfile_addn = ''
-if args.cv_set:
-    u_train_r = train_data['lig1'].str[:4].unique().tolist()
-    gnina_r = output['lig1'].str[:4].tolist()
-    is_train = pd.Series([item in u_train_r for item in gnina_r])
-        
-    output = output.assign(is_train = is_train.values)
-    output = output[output.is_train == 1]
-    outfile_addn = 'cv_set_'
-    output.sort_values(by=['lig1','lig2'],inplace=True, ignore_index=True)
-    train_data.sort_values(by=['lig1','lig2'],inplace=True, ignore_index=True)
-assert output.shape[0] == train_data.shape[0]
-print(output.head(10),train_data.head(10))
-gnina_lbls = output[['l_gnina_aff','l_scr','l_vina_aff']].copy()
-labels = train_data['label']
-comp_dict = gnina_lbls.eq(labels, axis=0).mean(axis=0, numeric_only=True).to_dict()
-output_string = '# {}:\nMetric | Accuracy\n-----|-----\nGNINA Affinity | {:.4f}\nGNINA Score | {:.4f}'.format(args.model, comp_dict['l_gnina_aff'],comp_dict['l_scr'])
-if args.vina:
-    output_string += '\nVina Affinity | {:.4f}'.format(comp_dict['l_vina_aff'])
-model_stat = 'GNINA_RUN/{}{}_stats.md'.format(outfile_addn, args.model)
-with open(model_stat,'w') as f:
-    f.write(output_string)
+    base_dir='/net/dali/home/mscbio/anm329/deltadeltaG/'
+    for logfile in logfiles:
+        with open(base_dir+logfile) as f:
+            for line in f:
+                if 'Affinity' in line:
+                    aff = float(re.findall(r'[\-\d.]+',line)[0])
+                elif 'CNNscore' in line:
+                    score = float(re.findall(r'[\d.]+',line)[0])
+                elif 'CNNaffinity' in line:
+                    caff = float(re.findall(r'[\d.]+',line)[0])
+        name = logfile.replace(f'{args.model}','&').split('&')[1].split('.')[0].strip('_')
+        ligand_list.append([name,caff,score,aff])
+    gnina_out_df = pd.DataFrame(ligand_list,columns=['name','cnn_aff','cnn_score','vina_aff'])
+
+    gnina_out_df['rec'] = gnina_out_df['name'].apply(lambda x: re.findall('[A-Z\d]{4}',x)[0])
+    gnina_out_df.to_csv('test_affinities.csv')
+    gnina_out_by_rec = gnina_out_df.groupby('rec')
+    list_of_data = []
+    for rec,group in gnina_out_by_rec:
+        lig_perms = permutations(list(group.index),2)
+        for lig1,lig2 in lig_perms:
+            try:
+                ## CNN outputs pK which should correlate with pIC50
+                diffgaff = gnina_out_df.at[lig1,'cnn_aff'] - gnina_out_df.at[lig2,'cnn_aff']
+                diffcnn_score = gnina_out_df.at[lig1,'cnn_score'] - gnina_out_df.at[lig2,'cnn_score']
+                # Vina score is dG => we need to do -log10{exp(VINA/[R*T])} to get pK
+                # Vina is in kcal/mol so we have R=1.987E-3 kcal/(K*mol) and T=293 => 0.582 kcal/mol
+                diffPvaff = -np.log10(np.exp(gnina_out_df.at[lig1,'vina_aff']/0.582)) + np.log10(np.exp(gnina_out_df.at[lig2,'vina_aff']/0.582))
+                info = [diffgaff,diffcnn_score,diffPvaff,rec,gnina_out_df.at[lig1,'name'],gnina_out_df.at[lig2,'name']]
+                list_of_data.append(info)
+            except Exception as e:
+                print(rec,lig1,lig2, e)
+    output_gnina_ddg = pd.DataFrame(list_of_data)
+    output_gnina_ddg.columns = ['DDG_CNNaff', 'DDG_scr','DDG_Paff','rec', 'lig1', 'lig2']
+
+    gnina_ddg = '/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/gnina_DDG_{}.txt'.format(args.model)
+    output_gnina_ddg.to_csv(gnina_ddg, sep=' ', index=False)
+
+    return output_gnina_ddg
+
+def getDDGstats(compare_ddg_df,ground_truth_files):
+    ligname_pattern = re.compile(r'(?:\/)([A-Z\d]{4}[\d]{2})(?:_.\.gninatypes)')
+    comp_dict = dict()
+    for trainfile in ground_truth_files:
+        file_data = pd.read_csv(trainfile, sep=' ', header=None)
+        train_data = file_data[[1,file_data.columns[-2],file_data.columns[-1]]].copy()
+        train_data.columns = ['DDG','lig1','lig2']
+        train_data['lig2'] = train_data['lig2'].apply(lambda x: re.findall(ligname_pattern,x)[0])
+        train_data['lig1'] = train_data['lig1'].apply(lambda x: re.findall(ligname_pattern,x)[0])
+        train_data['lig1_lig2'] = train_data['lig1'] + train_data['lig2']
+        sorted_train = train_data.sort_values(by=['lig1_lig2'])
+        subset_gnina_ddg = compare_ddg_df[compare_ddg_df['lig1_lig2'].isin(train_data['lig1_lig2'])]
+
+        assert subset_gnina_ddg.shape[0] == train_data.shape[0]
+        for col in subset_gnina_ddg.columns:
+            if 'DDG' not in col:
+                continue
+            r,_ = pearsonr(subset_gnina_ddg[col].to_numpy(),sorted_train['DDG'].to_numpy())
+            rmse = np.sqrt(((subset_gnina_ddg[col].to_numpy()-sorted_train['DDG'].to_numpy()) ** 2).mean())
+            comp_dict[f'{trainfile.split("/")[-1]}_{col}_r'] = r
+            comp_dict[f'{trainfile.split("/")[-1]}_{col}_rmse'] = rmse
+
+    output_string = f'# {args.model}\n -----'
+    for tfile in args.trainf:
+        output_string += f'\n## {tfile}:\n'
+        output_string += 'Metric | R | RMSE\n-----|-----|-----\nGNINA Affinity | {:.4f} | {:.2f} \nGNINA Score | {:.4f} | {:.2f}'.format(comp_dict[f'{tfile.split("/")[-1]}_DDG_CNNaff_r'], comp_dict[f'{tfile.split("/")[-1]}_DDG_CNNaff_rmse'], comp_dict[f'{tfile.split("/")[-1]}_DDG_scr_r'], comp_dict[f'{tfile.split("/")[-1]}_DDG_scr_rmse'])
+        output_string += '\nVina Affinity | {:.4f} | {:.4f}'.format(comp_dict[f'{tfile.split("/")[-1]}_DDG_Paff_r'], comp_dict[f'{tfile.split("/")[-1]}_DDG_Paff_rmse'])
+    model_stat = f'/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/{args.model}_stats.md'
+    with open(model_stat,'w') as f:
+        f.write(output_string)
+
+if not args.pre_compiled:
+   print(f"Creating Gnina DDG file from gf argument({args.gf}) and the logfiles output by the gnina runs")
+   gnina_ddg_df = makeGninaDDGFile() 
+else:
+    print(f"Reading in Gnina DDG file (/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/gnina_DDG_{args.model}.txt)")
+    gnina_ddg_df = pd.read_csv(f'/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/gnina_DDG_{args.model}.txt', sep=' ')
+gnina_ddg_df['lig1_lig2'] = gnina_ddg_df['lig1'].apply(lambda x:re.findall('[A-Z\d]{4}\d{2}',x)[0]) + gnina_ddg_df['lig2'].apply(lambda x:re.findall('[A-Z\d]{4}\d{2}',x)[0])
+gnina_ddg_df = gnina_ddg_df.sort_values(by=['lig1_lig2'])
+if len(args.trainf) > 0:
+    print(f"Creating DDG stats for Gnina\nUsing these files for ground truth:\n\t{','.join(args.trainf)}\n")
+    getDDGstats(gnina_ddg_df, args.trainf)
