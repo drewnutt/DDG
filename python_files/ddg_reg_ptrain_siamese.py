@@ -62,22 +62,21 @@ def weights_init(m):
         if m.bias is not None:
             init.constant_(m.bias.data,0)
 
-def train(model, traine, optimizer, epoch, size):
+def train(model, traine, optimizer, epoch):
     model.train()
     train_loss = 0
     lig_loss = 0
 
     output_dist,actual = [], []
     lig_pred,lig_labels = [] , []
-    for _ in range(size[0]):
-        batch_1 = traine.next_batch(batch_size)
-        gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
-        batch_1.extract_label(1, float_labels)
+    for idx,batch in enumerate(traine):
+        gmaker.forward(batch, input_tensor_1,random_translation=2.0, random_rotation=True) 
+        batch.extract_label(1, float_labels)
         labels = torch.unsqueeze(float_labels,1).float().to('cuda')
         optimizer.zero_grad()
         if args.absolute_dg_loss:
-            batch_1.extract_label(2, lig1_label)
-            batch_1.extract_label(3, lig2_label)
+            batch.extract_label(2, lig1_label)
+            batch.extract_label(3, lig2_label)
             lig1_labels = torch.unsqueeze(lig1_label,1).float().to('cuda')
             lig2_labels = torch.unsqueeze(lig2_label,1).float().to('cuda')
             output, lig1, lig2 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
@@ -99,6 +98,7 @@ def train(model, traine, optimizer, epoch, size):
         output_dist += output.flatten().tolist()
         actual += labels.flatten().tolist()
 
+    total_samples = (idx + 1) * len(batch) 
     try:
         r, _=pearsonr(np.array(actual),np.array(output_dist))
     except ValueError as e:
@@ -114,9 +114,9 @@ def train(model, traine, optimizer, epoch, size):
             tmp = r
             r = (tmp,np.nan)
     rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-    avg_loss = train_loss/(size[2])
+    avg_loss = train_loss/(total_samples)
     if args.absolute_dg_loss:
-        avg_lig_loss = lig_loss / (2*size[2])
+        avg_lig_loss = lig_loss / (2*total_samples)
         tmp = avg_loss
         avg_loss = (tmp,avg_lig_loss)
         rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
@@ -124,7 +124,7 @@ def train(model, traine, optimizer, epoch, size):
         rmse = (rmse, rmse_ligs)
     return avg_loss, output_dist, r, rmse,actual
 
-def test(model, test_data, size, test_recs_split=None):
+def test(model, test_data, test_recs_split=None):
     model.eval()
     test_loss = 0
     lig_loss = 0
@@ -132,15 +132,14 @@ def test(model, test_data, size, test_recs_split=None):
     output_dist,actual = [],[]
     lig_pred,lig_labels = [] , []
     with torch.no_grad():
-        for _ in range(size[0]):        
-            batch_1 = test_data.next_batch(batch_size)
-            gmaker.forward(batch_1, input_tensor_1,random_translation=2.0, random_rotation=True) 
-            batch_1.extract_label(1, float_labels)
+        for idx, batch in enumerate(test_data):        
+            gmaker.forward(batch, input_tensor_1,random_translation=2.0, random_rotation=True) 
+            batch.extract_label(1, float_labels)
             labels = torch.unsqueeze(float_labels,1).float().to('cuda')
             optimizer.zero_grad()
             if args.absolute_dg_loss:
-                batch_1.extract_label(2, lig1_label)
-                batch_1.extract_label(3, lig2_label)
+                batch.extract_label(2, lig1_label)
+                batch.extract_label(3, lig2_label)
                 lig1_labels = torch.unsqueeze(lig1_label,1).float().to('cuda')
                 lig2_labels = torch.unsqueeze(lig2_label,1).float().to('cuda')
                 output,lig1,lig2 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
@@ -157,6 +156,8 @@ def test(model, test_data, size, test_recs_split=None):
             test_loss += loss
             output_dist += output.flatten().tolist()
             actual += labels.flatten().tolist()
+
+    total_samples = (idx + 1) * len(batch) 
 
     # Calculating "Average" Pearson's R across each receptor
     if test_recs_split is not None:
@@ -187,9 +188,9 @@ def test(model, test_data, size, test_recs_split=None):
             tmp = r
             r = (tmp,np.nan)
     rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-    avg_loss = test_loss/(size[2])
+    avg_loss = test_loss/(total_samples)
     if args.absolute_dg_loss:
-        avg_lig_loss = lig_loss / (2*size[2])
+        avg_lig_loss = lig_loss / (2*total_samples)
         tmp = avg_loss
         avg_loss = (tmp,avg_lig_loss)
         rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
@@ -208,9 +209,9 @@ print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
 
 
 
-traine = molgrid.ExampleProvider(ligmolcache=args.ligtr,recmolcache=args.rectr,balanced=True,shuffle=True, duplicate_first=True)
+traine = molgrid.ExampleProvider(ligmolcache=args.ligtr,recmolcache=args.rectr,balanced=True,shuffle=True, duplicate_first=True,default_batch_size=batch_size,iteration_scheme=molgrid.IterationScheme.SmallEpoch)
 traine.populate(args.trainfile)
-teste = molgrid.ExampleProvider(ligmolcache=args.ligte,recmolcache=args.recte,shuffle=True, duplicate_first=True)
+teste = molgrid.ExampleProvider(ligmolcache=args.ligte,recmolcache=args.recte,shuffle=True, duplicate_first=True,default_batch_size=batch_size,iteration_scheme=molgrid.IterationScheme.SmallEpoch)
 teste.populate(args.testfile)
 # To compute the "average" pearson R per receptor, count the number of pairs for each rec then iterate over that number later during test time
 # test_exs_per_rec=dict()
@@ -228,18 +229,9 @@ teste.populate(args.testfile)
 #         else:
 #             count += 1
 
-trsize = traine.size()
-tssize = teste.size()
-one_e_tr = int(trsize/batch_size)
-leftover_tr = trsize % batch_size
-one_e_tt = int(tssize/batch_size)
-leftover_tt = tssize % batch_size
-
 gmaker = molgrid.GridMaker(binary=args.binary_rep)
 dims = gmaker.grid_dimensions(14*4) #only one rec+onelig per example
 tensor_shape = (batch_size,)+dims
-tr_nums=(one_e_tr,leftover_tr,trsize)
-tt_nums=(one_e_tt,leftover_tt, tssize)
 
 actual_dims = (dims[0]//2, *dims[1:])
 model = Net(actual_dims,args)
@@ -283,24 +275,15 @@ if args.absolute_dg_loss:
     lig2_label = torch.zeros(batch_size, dtype=torch.float32)
 
 
-if leftover_tr != 0:
-        tr_leftover_shape = (leftover_tr,) + dims
-        tr_l_tensor = torch.zeros(tr_leftover_shape, dtype=torch.float32, device='cuda')
-        tr_l_labels = torch.zeros(leftover_tr, dtype=torch.float32)
-if leftover_tt != 0:
-        tt_leftover_shape = (leftover_tt,) + dims
-        tt_l_tensor = torch.zeros(tt_leftover_shape, dtype=torch.float32, device='cuda')
-        tt_l_labels = torch.zeros(leftover_tt, dtype=torch.float32)
-
 wandb.watch(model,log='all')
 print('extra stats:{}'.format(args.extra_stats))
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
-tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste, tt_nums)
+tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste)
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}')
 for epoch in range(1,epochs+1):
-    tr_loss, out_dist, tr_r, tr_rmse,tr_act = train(model, traine, optimizer, epoch,tr_nums)
-    tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste, tt_nums)
+    tr_loss, out_dist, tr_r, tr_rmse,tr_act = train(model, traine, optimizer, epoch)
+    tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste)
     if args.absolute_dg_loss:
         scheduler.step(tr_loss[0])
     else:
