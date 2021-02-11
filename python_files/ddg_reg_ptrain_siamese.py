@@ -39,7 +39,8 @@ parser.add_argument('--use_weights','-w',help='pretrained weights to use for the
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=128,type=int,help='size of fully connected layer before subtraction in latent space')
 parser.add_argument('--absolute_dg_loss', '-L',action='store_true',default=False,help='use a loss function (and model architecture) that utilizes the absolute binding affinity')
-parser.add_argument('--consistency_term','-C',action='store_true',default=False,help='Use a consistency term in the multitask loss function to ensure absolute affinities agree with the relative binding affinities')
+parser.add_argument('--rotation_loss_weight','-R',default=1.0,type=float,help='weight to use in adding the rotation loss to the other losses (default: %(default)d)')
+parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help='weight to use in adding the consistency term to the other losses (default: %(default)d')
 args = parser.parse_args()
 
 print(args.absolute_dg_loss, args.use_model)
@@ -89,7 +90,7 @@ def train(model, traine, optimizer, epoch):
             rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
             rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
             rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
-            loss = loss_lig1 + loss_lig2 + ddg_loss + rotation_loss + int(args.consistency_term) * nn.functional.mse_loss((lig1-lig2),output)
+            loss = loss_lig1 + loss_lig2 + ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
             lig_loss += loss_lig1 + loss_lig2
@@ -162,7 +163,7 @@ def test(model, test_data, test_recs_split=None):
                 rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
                 rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
                 rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
-                loss = loss_lig1 + loss_lig2 + ddg_loss + rotation_loss + int(args.consistency_term) * nn.functional.mse_loss((lig1-lig2),output)
+                loss = loss_lig1 + loss_lig2 + ddg_loss + rotation_loss + nn.functional.mse_loss((lig1-lig2),output)
                 lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
                 lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
                 lig_loss += loss_lig1 + loss_lig2
@@ -355,8 +356,8 @@ for epoch in range(1,epochs+1):
     else: # log the information about the aboslute affinity predictions as well
         print(f'Test/Train AbsAff R:{tt_r[1]:.4f}\t{tr_r[1]:.4f}')
         wandb.log({
-            "Avg Train Loss": tr_loss[0],
-            "Avg Test Loss": tt_loss[0],
+            "Avg Train Loss Total": tr_loss[0],
+            "Avg Test Loss Total": tt_loss[0],
             "Train R": tr_r[0],
             "Test R": tt_r[0],
             #"Test 'Average' R": tt_rave,
@@ -364,6 +365,10 @@ for epoch in range(1,epochs+1):
             "Test RMSE": tt_rmse[0],
             "Avg Train Loss AbsAff": tr_loss[1],
             "Avg Test Loss AbsAff": tt_loss[1],
+            "Avg Train Loss DDG": tr_loss[2],
+            "Avg Test Loss DDG": tt_loss[2],
+            "Avg Train Loss Rotation": tr_loss[2],
+            "Avg Test Loss Rotation": tt_loss[2],
             "Train R AbsAff": float(tr_r[1]),
             "Test R AbsAff": float(tt_r[1]),
             "Train RMSE AbsAff": tr_rmse[1],
