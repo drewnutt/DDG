@@ -41,6 +41,7 @@ parser.add_argument('--hidden_size',default=128,type=int,help='size of fully con
 parser.add_argument('--absolute_dg_loss', '-L',action='store_true',default=False,help='use a loss function (and model architecture) that utilizes the absolute binding affinity')
 parser.add_argument('--rotation_loss_weight','-R',default=1.0,type=float,help='weight to use in adding the rotation loss to the other losses (default: %(default)d)')
 parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help='weight to use in adding the consistency term to the other losses (default: %(default)d')
+parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
 args = parser.parse_args()
 
 print(args.absolute_dg_loss, args.use_model)
@@ -90,7 +91,7 @@ def train(model, traine, optimizer, epoch):
             rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
             rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
             rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
-            loss = loss_lig1 + loss_lig2 + ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
+            loss = args.absolute_loss_weight * ( loss_lig1 + loss_lig2 ) + ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
             lig_loss += loss_lig1 + loss_lig2
@@ -163,7 +164,7 @@ def test(model, test_data, test_recs_split=None):
                 rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
                 rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
                 rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
-                loss = loss_lig1 + loss_lig2 + ddg_loss + rotation_loss + nn.functional.mse_loss((lig1-lig2),output)
+                loss = args.absolute_loss_weight * ( loss_lig1 + loss_lig2 ) + ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
                 lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
                 lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
                 lig_loss += loss_lig1 + loss_lig2
