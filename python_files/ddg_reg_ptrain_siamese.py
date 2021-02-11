@@ -64,13 +64,13 @@ def weights_init(m):
 
 def train(model, traine, optimizer, epoch):
     model.train()
-    train_loss = 0
-    lig_loss = 0
+    full_loss, lig_loss, rot_loss, DDG_loss = 0,0,0,0
 
     output_dist,actual = [], []
     lig_pred,lig_labels = [] , []
     for idx,batch in enumerate(traine):
         gmaker.forward(batch, input_tensor_1,random_translation=2.0, random_rotation=True) 
+        gmaker.forward(batch, input_tensor_2,random_translation=2.0, random_rotation=True) 
         batch.extract_label(1, float_labels)
         labels = torch.unsqueeze(float_labels,1).float().to('cuda')
         optimizer.zero_grad()
@@ -80,17 +80,25 @@ def train(model, traine, optimizer, epoch):
             lig1_labels = torch.unsqueeze(lig1_label,1).float().to('cuda')
             lig2_labels = torch.unsqueeze(lig2_label,1).float().to('cuda')
             output, lig1, lig2 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
+            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:,:28,:,:,:],input_tensor_2[:,:28,:,:,:]) #Same rec-lig pair input to both arms, just rotated/translated differently
+            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:,28:,:,:,:],input_tensor_2[:,28:,:,:,:]) #Repeated for the second ligand
             loss_lig1 = criterion_lig1(lig1,lig1_labels)
             loss_lig2 = criterion_lig2(lig2,lig2_labels)
             ddg_loss = criterion(output,labels)
-            loss = loss_lig1 + loss_lig2 + ddg_loss + int(args.consistency_term) * criterion((lig1-lig2),output)
+            rotation_loss = ddgrotloss1(ddg_lig1,torch.zeros(ddg_lig1.size(),device='cuda')) 
+            rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
+            rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
+            rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
+            loss = loss_lig1 + loss_lig2 + ddg_loss + rotation_loss + int(args.consistency_term) * nn.functional.mse_loss((lig1-lig2),output)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
             lig_loss += loss_lig1 + loss_lig2
+            rot_loss += rotation_loss
+            DDG_loss += ddg_loss
         else:
             output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
             loss = criterion(output,labels)
-        train_loss += loss
+        full_loss += loss
         loss.backward()
         if args.clip > 0:
             nn.utils.clip_grad_norm_(model.parameters(),args.clip)
@@ -114,11 +122,13 @@ def train(model, traine, optimizer, epoch):
             tmp = r
             r = (tmp,np.nan)
     rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-    avg_loss = train_loss/(total_samples)
+    avg_loss = full_loss/(total_samples)
     if args.absolute_dg_loss:
         avg_lig_loss = lig_loss / (2*total_samples)
+        avg_rot_loss = rot_loss / (total_samples)
+        avg_DDG_loss = DDG_loss / (total_samples)
         tmp = avg_loss
-        avg_loss = (tmp,avg_lig_loss)
+        avg_loss = (tmp,avg_lig_loss,avg_DDG_loss,avg_rot_loss)
         rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
         tmp = rmse
         rmse = (rmse, rmse_ligs)
@@ -126,14 +136,14 @@ def train(model, traine, optimizer, epoch):
 
 def test(model, test_data, test_recs_split=None):
     model.eval()
-    test_loss = 0
-    lig_loss = 0
+    test_loss, lig_loss, rot_loss, DDG_loss = 0,0,0,0
 
     output_dist,actual = [],[]
     lig_pred,lig_labels = [] , []
     with torch.no_grad():
         for idx, batch in enumerate(test_data):        
             gmaker.forward(batch, input_tensor_1,random_translation=2.0, random_rotation=True) 
+            gmaker.forward(batch, input_tensor_2,random_translation=2.0, random_rotation=True) 
             batch.extract_label(1, float_labels)
             labels = torch.unsqueeze(float_labels,1).float().to('cuda')
             optimizer.zero_grad()
@@ -143,10 +153,16 @@ def test(model, test_data, test_recs_split=None):
                 lig1_labels = torch.unsqueeze(lig1_label,1).float().to('cuda')
                 lig2_labels = torch.unsqueeze(lig2_label,1).float().to('cuda')
                 output,lig1,lig2 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
+                ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:,:28,:,:,:],input_tensor_2[:,:28,:,:,:]) #Same rec-lig pair input to both arms, just rotated/translated differently
+                ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:,28:,:,:,:],input_tensor_2[:,28:,:,:,:]) #Repeated for the second ligand
                 loss_lig1 = criterion_lig1(lig1,lig1_labels)
                 loss_lig2 = criterion_lig2(lig2,lig2_labels)
                 ddg_loss = criterion(output,labels)
-                loss = loss_lig1 + loss_lig2 + ddg_loss + int(args.consistency_term) * criterion((lig1-lig2),output)
+                rotation_loss = ddgrotloss1(ddg_lig1,torch.zeros(ddg_lig1.size(),device='cuda')) 
+                rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
+                rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
+                rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
+                loss = loss_lig1 + loss_lig2 + ddg_loss + rotation_loss + int(args.consistency_term) * nn.functional.mse_loss((lig1-lig2),output)
                 lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
                 lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
                 lig_loss += loss_lig1 + loss_lig2
@@ -191,8 +207,10 @@ def test(model, test_data, test_recs_split=None):
     avg_loss = test_loss/(total_samples)
     if args.absolute_dg_loss:
         avg_lig_loss = lig_loss / (2*total_samples)
+        avg_rot_loss = rot_loss / (total_samples)
+        avg_DDG_loss = DDG_loss / (total_samples)
         tmp = avg_loss
-        avg_loss = (tmp,avg_lig_loss)
+        avg_loss = (tmp,avg_lig_loss,avg_DDG_loss,avg_rot_loss)
         rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
         tmp = rmse
         rmse = (rmse, rmse_ligs)
@@ -264,6 +282,10 @@ criterion = nn.MSELoss()
 if args.absolute_dg_loss: # Note these are the same loss functions as the main one, so in production these could jsut use the same, but this allows for different loss functions
     criterion_lig1 = nn.MSELoss()
     criterion_lig2 = nn.MSELoss()
+    ddgrotloss1 = nn.MSELoss()
+    ddgrotloss2 = nn.MSELoss()
+    dgrotloss1  = nn.MSELoss()
+    dgrotloss2  = nn.MSELoss()
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=0.001, verbose=True)
 
