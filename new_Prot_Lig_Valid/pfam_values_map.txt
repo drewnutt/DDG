@@ -71,5 +71,4 @@ Number Test_PFAM
 69 AMP-binding
 70 Peptidase_S28
 71 IDO
-72 dNK
-73 An_peroxidase
+72 An_peroxidase
