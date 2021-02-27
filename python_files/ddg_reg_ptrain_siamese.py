@@ -42,6 +42,7 @@ parser.add_argument('--absolute_dg_loss', '-L',action='store_true',default=False
 parser.add_argument('--rotation_loss_weight','-R',default=1.0,type=float,help='weight to use in adding the rotation loss to the other losses (default: %(default)d)')
 parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help='weight to use in adding the consistency term to the other losses (default: %(default)d')
 parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
+parser.add_argument('--ddg_loss_weight','-D',default=1.0,type=float,help='weight to use in adding the DDG loss terms to the other losses (default: %(default)d')
 args = parser.parse_args()
 
 print(args.absolute_dg_loss, args.use_model)
@@ -91,7 +92,7 @@ def train(model, traine, optimizer, epoch):
             rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
             rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
             rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
-            loss = args.absolute_loss_weight * ( loss_lig1 + loss_lig2 ) + ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
+            loss = args.absolute_loss_weight * ( loss_lig1 + loss_lig2 ) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
             lig_loss += loss_lig1 + loss_lig2
@@ -164,10 +165,12 @@ def test(model, test_data, test_recs_split=None):
                 rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
                 rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
                 rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
-                loss = args.absolute_loss_weight * ( loss_lig1 + loss_lig2 ) + ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
+                loss = args.absolute_loss_weight * ( loss_lig1 + loss_lig2 ) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
                 lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
                 lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
                 lig_loss += loss_lig1 + loss_lig2
+                rot_loss += rotation_loss
+                DDG_loss += ddg_loss
             else:
                 output = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:,:,:,:])
                 loss = criterion(output,labels)
@@ -206,11 +209,11 @@ def test(model, test_data, test_recs_split=None):
             tmp = r
             r = (tmp,np.nan)
     rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-    avg_loss = test_loss/(total_samples)
+    avg_loss = float(test_loss)/(total_samples)
     if args.absolute_dg_loss:
-        avg_lig_loss = lig_loss / (2*total_samples)
-        avg_rot_loss = rot_loss / (total_samples)
-        avg_DDG_loss = DDG_loss / (total_samples)
+        avg_lig_loss = float(lig_loss) / (2*total_samples)
+        avg_rot_loss = float(rot_loss) / (total_samples)
+        avg_DDG_loss = float(DDG_loss) / (total_samples)
         tmp = avg_loss
         avg_loss = (tmp,avg_lig_loss,avg_DDG_loss,avg_rot_loss)
         rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
@@ -368,8 +371,8 @@ for epoch in range(1,epochs+1):
             "Avg Test Loss AbsAff": tt_loss[1],
             "Avg Train Loss DDG": tr_loss[2],
             "Avg Test Loss DDG": tt_loss[2],
-            "Avg Train Loss Rotation": tr_loss[2],
-            "Avg Test Loss Rotation": tt_loss[2],
+            "Avg Train Loss Rotation": tr_loss[3],
+            "Avg Test Loss Rotation": tt_loss[3],
             "Train R AbsAff": float(tr_r[1]),
             "Test R AbsAff": float(tt_r[1]),
             "Train RMSE AbsAff": tr_rmse[1],
