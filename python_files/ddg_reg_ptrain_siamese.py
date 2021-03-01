@@ -137,6 +137,31 @@ def train(model, traine, optimizer, epoch):
         rmse = (rmse, rmse_ligs)
     return avg_loss, output_dist, r, rmse,actual
 
+def train_rotation(model, traine, optimizer, epoch):
+    model.train()
+    full_loss = 0
+
+    for idx, batch in enumerate(traine):
+        if idx >= args.max_train_iter:
+            break
+        gmaker.forward(batch, input_tensor_1,random_translation=2.0, random_rotation=True) 
+        gmaker.forward(batch, input_tensor_2,random_translation=2.0, random_rotation=True) 
+        optimizer.zero_grad()
+        ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:,:28,:,:,:],input_tensor_2[:,:28,:,:,:]) #Same rec-lig pair input to both arms, just rotated/translated differently
+        ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:,28:,:,:,:],input_tensor_2[:,28:,:,:,:]) #Repeated for the second ligand
+        rotation_loss = ddgrotloss1(ddg_lig1,torch.zeros(ddg_lig1.size(),device='cuda')) 
+        rotation_loss += ddgrotloss2(ddg_lig2,torch.zeros(ddg_lig1.size(),device='cuda')) 
+        rotation_loss += dgrotloss1(dg1_lig1,dg2_lig1) 
+        rotation_loss += dgrotloss2(dg1_lig2,dg2_lig2) 
+        loss = args.rotation_loss_weight * rotation_loss
+        full_loss += loss
+        loss.backward()
+        optimizer.step()
+
+    total_samples = (idx + 1) * len(batch) 
+    avg_loss = full_loss/(total_samples)
+    return avg_loss
+
 def test(model, test_data, test_recs_split=None):
     model.eval()
     test_loss, lig_loss, rot_loss, DDG_loss = 0,0,0,0
