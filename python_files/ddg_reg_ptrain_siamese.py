@@ -138,7 +138,9 @@ def train(model, traine, optimizer, latent_rep, epoch):
     rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
     tmp = rmse
     rmse = (rmse, rmse_ligs)
-    return avg_loss, output_dist, r, rmse,actual
+    both_calc_distr = (output_dist,lig_pred)
+    both_labels = (actual,lig_labels)
+    return avg_loss, both_calc_distr, r, rmse, both_labels
 
 def train_rotation(model, ss_data, optimizer, latent_rep):
     model.train()
@@ -252,7 +254,9 @@ def test(model, test_data, latent_rep,test_recs_split=None):
     rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
     tmp = rmse
     rmse = (rmse, rmse_ligs)
-    return avg_loss, output_dist, r, rmse, actual, r_ave, r_per_rec
+    both_calc_distr = (output_dist, lig_pred)
+    both_labels = (actual, lig_labels)
+    return avg_loss, both_calc_distr, r, rmse, both_labels, r_ave, r_per_rec
 
 
 tgs = ['two_legged'] + args.tags
@@ -353,21 +357,33 @@ for epoch in range(1, epochs+1):
     else:
         scheduler.step(tr_loss)
     
-    wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist))}, commit=False)
-    wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
+    wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist[0]))}, commit=False)
+    wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d[0]))}, commit=False)
     if epoch % 10 == 0: # only log the graphs every 10 epochs, make things a bit faster
         fig = plt.figure(1)
         fig.clf()
-        plt.scatter(tr_act,out_dist)
+        plt.scatter(tr_act[0], out_dist[0])
         plt.xlabel('Actual DDG')
         plt.ylabel('Predicted DDG')
         wandb.log({"Actual vs. Predicted DDG (Train)": fig}, commit=False)
         test_fig = plt.figure(2)
         test_fig.clf()
-        plt.scatter(tt_act,out_d)
+        plt.scatter(tt_act[0], out_d[0])  # the first one is the ddg
         plt.xlabel('Actual DDG')
         plt.ylabel('Predicted DDG')
         wandb.log({"Actual vs. Predicted DDG (Test)": test_fig}, commit=False)
+        train_absaff_fig = plt.figure(3)
+        train_absaff_fig.clf()
+        plt.scatter(tr_act[1],out_dist[1])
+        plt.xlabel('Actual affinity')
+        plt.ylabel('Predicted affinity')
+        wandb.log({"Actual vs. Predicted Affinity (Train)": train_absaff_fig})
+        test_absaff_fig = plt.figure(4)
+        test_absaff_fig.clf()
+        plt.scatter(tt_act[1],out_d[1])
+        plt.xlabel('Actual affinity')
+        plt.ylabel('Predicted affinity')
+        wandb.log({"Actual vs. Predicted Affinity (Test)": test_absaff_fig})
         if args.extra_stats:
             rperr_fig = plt.figure(3)
             rperr_fig.clf()
@@ -385,35 +401,25 @@ for epoch in range(1, epochs+1):
             plt.ylabel("Pearson's R")
             wandb.log({"R Value Per Num_Ligs (Test)": rvsnligs_fig},commit=False)
 
-    if not args.absolute_dg_loss:
-        wandb.log({
-            "Avg Train Loss": tr_loss,
-            "Avg Test Loss": tt_loss,
-            "Train R": tr_r,
-            "Test R": tt_r,
-            #"Test 'Average' R": tt_rave,
-            "Train RMSE": tr_rmse,
-            "Test RMSE": tt_rmse})
-    else: # log the information about the aboslute affinity predictions as well
-        print(f'Test/Train AbsAff R:{tt_r[1]:.4f}\t{tr_r[1]:.4f}')
-        wandb.log({
-            "Avg Train Loss Total": tr_loss[0],
-            "Avg Test Loss Total": tt_loss[0],
-            "Train R": tr_r[0],
-            "Test R": tt_r[0],
-            #"Test 'Average' R": tt_rave,
-            "Train RMSE": tr_rmse[0],
-            "Test RMSE": tt_rmse[0],
-            "Avg Train Loss AbsAff": tr_loss[1],
-            "Avg Test Loss AbsAff": tt_loss[1],
-            "Avg Train Loss DDG": tr_loss[2],
-            "Avg Test Loss DDG": tt_loss[2],
-            "Avg Train Loss Rotation": tr_loss[3],
-            "Avg Test Loss Rotation": tt_loss[3],
-            "Train R AbsAff": float(tr_r[1]),
-            "Test R AbsAff": float(tt_r[1]),
-            "Train RMSE AbsAff": tr_rmse[1],
-            "Test RMSE AbsAff": tt_rmse[1]})
+    print(f'Test/Train AbsAff R:{tt_r[1]:.4f}\t{tr_r[1]:.4f}')
+    wandb.log({
+        "Avg Train Loss Total": tr_loss[0],
+        "Avg Test Loss Total": tt_loss[0],
+        "Train R": tr_r[0],
+        "Test R": tt_r[0],
+        #"Test 'Average' R": tt_rave,
+        "Train RMSE": tr_rmse[0],
+        "Test RMSE": tt_rmse[0],
+        "Avg Train Loss AbsAff": tr_loss[1],
+        "Avg Test Loss AbsAff": tt_loss[1],
+        "Avg Train Loss DDG": tr_loss[2],
+        "Avg Test Loss DDG": tt_loss[2],
+        "Avg Train Loss Rotation": tr_loss[3],
+        "Avg Test Loss Rotation": tt_loss[3],
+        "Train R AbsAff": float(tr_r[1]),
+        "Test R AbsAff": float(tt_r[1]),
+        "Train RMSE AbsAff": tr_rmse[1],
+        "Test RMSE AbsAff": tt_rmse[1]})
     if not epoch % 50:
             torch.save(model.state_dict(), "model.h5")
             wandb.save('model.h5')
