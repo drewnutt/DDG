@@ -28,6 +28,7 @@ parser.add_argument('--momentum', default=0.9, type=float, help='momentum of opt
 parser.add_argument('--solver', default="sgd", choices=('adam','sgd'), type=str, help="solver to use")
 parser.add_argument('--epoch',default=200,type=int,help='number of epochs to train for (default %(default)d)')
 parser.add_argument('--rotation_epoch',default=30,type=int,help='number of epochs to train for (default %(default)d)')
+parser.add_argument('--max_train_iter',default=1,type=int,help='number of epochs to train for (default %(default)d)')
 parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb run')
 parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use batch normalization during the training process')
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
@@ -43,6 +44,7 @@ parser.add_argument('--rotation_loss_weight','-R',default=1.0,type=float,help='w
 parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help='weight to use in adding the consistency term to the other losses (default: %(default)d')
 parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
 parser.add_argument('--ddg_loss_weight','-D',default=1.0,type=float,help='weight to use in adding the DDG loss terms to the other losses (default: %(default)d')
+parser.add_argument('--run_model','-rm',required=True,help='run_path from wandb')
 args = parser.parse_args()
 
 tgs = ['two_legged'] + args.tags
@@ -61,21 +63,21 @@ args_dict['recte'] = recte
 args_dict['testfile'] = testfile
 print(args)
 
-wandb.config.update(args,allow_val_change=true)
+wandb.config.update(args,allow_val_change=True)
 
 print(args.absolute_dg_loss, args.use_model)
 assert (args.absolute_dg_loss and args.use_model in ['multtask_def2018', 'ext_mult_def2018']) or (not args.absolute_dg_loss and args.use_model in ['paper','def2018','extend_def2018']), 'cannot have multitask loss with a non-multitask model'
 
 if  args.use_model == 'paper':
-    from paper_model import net
+    from paper_model import Net
 elif args.use_model == 'def2018':
-    from default2018_model import net
+    from default2018_model import Net
 elif args.use_model == 'extend_def2018':
-    from extended_default2018_model import net
+    from extended_default2018_model import Net
 elif args.use_model == 'multtask_def2018':
-    from multtask_def2018_model import net
+    from multtask_def2018_model import Net
 elif args.use_model == 'ext_mult_def2018':
-    from extended_multtask_def2018_model import net
+    from extended_multtask_def2018_model import Net
 
 def weights_init(m):
     if isinstance(m, nn.conv3d) or isinstance(m, nn.linear):
@@ -88,6 +90,8 @@ def train_rotation(model, traine, optimizer, epoch):
     full_loss = 0
 
     for idx, batch in enumerate(traine):
+        if idx >= args.max_train_iter:
+            break
         gmaker.forward(batch, input_tensor_1,random_translation=2.0, random_rotation=True) 
         gmaker.forward(batch, input_tensor_2,random_translation=2.0, random_rotation=True) 
         optimizer.zero_grad()
@@ -269,28 +273,45 @@ if args.absolute_dg_loss:
 
 wandb.watch(model,log='all')
 print('extra stats:{}'.format(args.extra_stats))
+tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste)
+wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
+wandb.log({
+    "Avg Test Loss Total": tt_loss[0],
+    "Test R": tt_r[0],
+    "Test RMSE": tt_rmse[0],
+    "Avg Test Loss AbsAff": tt_loss[1],
+    "Avg Test Loss DDG": tt_loss[2],
+    "Avg Test Loss Rotation": tt_loss[3],
+    "Test R AbsAff": float(tt_r[1]),
+    "Test RMSE AbsAff": tt_rmse[1]})
+print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}')
 for epoch in range(1,epochs+1):
-    rot_loss = train_rotation(model, teste, optimizer, epoch):
-    tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste, tt_nums)
-    wandb.log({"Output Distribution DDG Test": wandb.Histogram(np.array(out_d[0]))}, commit=False)
-    wandb.log({"Output Distribution Affinity Test": wandb.Histogram(np.array(out_d[1]))}, commit=False)
-    plt.scatter(tt_act[0],out_d[0])
-    plt.xlabel('Actual DDG')
-    plt.ylabel('Predicted DDG')
-    wandb.log({"Actual vs. Predicted DDG": plt})
-    plt.figure(2)
-    plt.scatter(tt_act[1],out_d[1])
-    plt.xlabel('Actual affinity')
-    plt.ylabel('Predicted affinity')
-    wandb.log({"Actual vs. Predicted Affinity": plt})
+    rot_loss = train_rotation(model, teste, optimizer, epoch)
+    tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste)
+
+    wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
+    if epoch % 10 == 0: # only log the graphs every 10 epochs, make things a bit faster
+        fig = plt.figure(1)
+        fig.clf()
+        plt.scatter(tt_act,out_d)
+        plt.xlabel('Actual DDG')
+        plt.ylabel('Predicted DDG')
+        wandb.log({"Actual vs. Predicted DDG (Test)": test_fig}, commit=False)
+
+    print(f'Test AbsAff R:{tt_r[1]:.4f}')
     wandb.log({
-        "Avg Test Loss": tt_loss[0],
+        "Avg Test Loss Total": tt_loss[0],
         "Test R": tt_r[0],
-        #"Test 'Average' R": tt_rave,
         "Test RMSE": tt_rmse[0],
         "Avg Test Loss AbsAff": tt_loss[1],
-        "Test R AbsAff": tt_r[1],
+        "Avg Test Loss DDG": tt_loss[2],
+        "Avg Train Loss Rotation": rot_loss,
+        "Avg Test Loss Rotation": tt_loss[3],
+        "Test R AbsAff": float(tt_r[1]),
         "Test RMSE AbsAff": tt_rmse[1]})
-    print("Final Test DDG Distribution: Mean={:.4f}, Var={:.4f}".format(np.mean(out_d[0]),np.var(out_d[0])))
-    print("Final Test Affinity Distribution: Mean={:.4f}, Var={:.4f}".format(np.mean(out_d[1]),np.var(out_d[1])))
-    print(f'Avg Test Loss: {tt_loss[0]},Test R: {tt_r[0]},Test RMSE: {tt_rmse[0]},Avg Test Loss AbsAff: {tt_loss[1]},Test R AbsAff: {tt_r[1]},Test RMSE AbsAff: {tt_rmse[1]}')
+    if not epoch % 50:
+            torch.save(model.state_dict(), "model.h5")
+            wandb.save('model.h5')
+            combined_data = np.array([out_d,tt_act]).T
+            np.savetxt("out_actual_ddg.csv", combined_data, delimiter=",")
+            wandb.save("out_actual_ddg.csv")
