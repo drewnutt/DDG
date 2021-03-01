@@ -34,7 +34,7 @@ parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to 
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
 parser.add_argument('--extra_stats',default=False,action='store_true',help='keep statistics about per receptor R values') 
-parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018'], help='Network architecture to use')
+parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=128,type=int,help='size of fully connected layer before subtraction in latent space')
