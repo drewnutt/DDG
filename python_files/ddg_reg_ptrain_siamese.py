@@ -46,7 +46,7 @@ parser.add_argument('--ddg_loss_weight','-D',default=1.0,type=float,help='weight
 args = parser.parse_args()
 
 print(args.absolute_dg_loss, args.use_model)
-assert (args.absolute_dg_loss and args.use_model in ['multtask_def2018', 'ext_mult_def2018']) or (not args.absolute_dg_loss and args.use_model in ['paper','def2018','extend_def2018']), 'Cannot have multitask loss with a non-multitask model'
+assert (args.absolute_dg_loss and args.use_model in ['multtask_def2018', 'ext_mult_def2018', 'multtask_latent_def2018']) or (not args.absolute_dg_loss and args.use_model in ['paper','def2018','extend_def2018']), 'Cannot have multitask loss with a non-multitask model'
 
 if  args.use_model == 'paper':
     from paper_model import Net
@@ -67,7 +67,7 @@ def weights_init(m):
         if m.bias is not None:
             init.constant_(m.bias.data,0)
 
-def train(model, traine, optimizer, latent_rep, epoch):
+def train(model, traine, optimizer, latent_rep):
     model.train()
     full_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
 
@@ -349,7 +349,7 @@ print('training now')
 tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep)
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}')
 for epoch in range(1, epochs+1):
-    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, epoch, latent_rep)
+    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
     tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep)
     if args.absolute_dg_loss:
