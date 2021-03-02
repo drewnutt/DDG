@@ -49,7 +49,7 @@ args = parser.parse_args()
 print(args.absolute_dg_loss, args.use_model)
 assert (args.absolute_dg_loss and args.use_model in ['multtask_def2018', 'ext_mult_def2018', 'multtask_latent_def2018']) or (not args.absolute_dg_loss and args.use_model in ['paper','def2018','extend_def2018']), 'Cannot have multitask loss with a non-multitask model'
 
-if  args.use_model == 'paper':
+if args.use_model == 'paper':
     from paper_model import Net
 elif args.use_model == 'def2018':
     from default2018_model import Net
@@ -66,7 +66,7 @@ def weights_init(m):
     if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
         init.xavier_uniform_(m.weight.data)
         if m.bias is not None:
-            init.constant_(m.bias.data,0)
+            init.constant_(m.bias.data, 0)
 
 def train(model, traine, optimizer, latent_rep):
     model.train()
@@ -271,7 +271,7 @@ else:
 batch_size = 16
 epochs = args.epoch
 
-print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
+# print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
 
 
 
@@ -350,9 +350,9 @@ print('training now')
 tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep)
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}')
 for epoch in range(1, epochs+1):
-    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
     if args.self_supervised_test:
         ss_loss = train_rotation(model, teste, optimizer, latent_rep)
+    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
     tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep)
     if args.absolute_dg_loss:
         scheduler.step(tr_loss[0])
