@@ -39,6 +39,7 @@ parser.add_argument('--use_weights','-w',help='pretrained weights to use for the
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=128,type=int,help='size of fully connected layer before subtraction in latent space')
 parser.add_argument('--absolute_dg_loss', '-L',action='store_true',default=False,help='use a loss function (and model architecture) that utilizes the absolute binding affinity')
+parser.add_argument('--self_supervised_test', '-S',action='store_true',default=False,help='Use the self supervised loss on the test files (no labels used)')
 parser.add_argument('--rotation_loss_weight','-R',default=1.0,type=float,help='weight to use in adding the rotation loss to the other losses (default: %(default)d)')
 parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help='weight to use in adding the consistency term to the other losses (default: %(default)d')
 parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
@@ -283,7 +284,7 @@ teste.populate(args.testfile)
 # with open(args.testfile) as test_types:
 #     count = 0
 #     rec = ''
-#     for line in test_types:
+#     for lineuse a loss function (and model architecture) that utilizes the absolute binding affinity in test_types:
 #         line_args = line.split(' ')
 #         newrec = re.findall(r'([A-Z0-9]{4})/',line_args[4])[0]
 #         if newrec != rec:
@@ -350,7 +351,8 @@ tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}')
 for epoch in range(1, epochs+1):
     tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
-    ss_loss = train_rotation(model, teste, optimizer, latent_rep)
+    if args.self_supervised_test:
+        ss_loss = train_rotation(model, teste, optimizer, latent_rep)
     tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep)
     if args.absolute_dg_loss:
         scheduler.step(tr_loss[0])
