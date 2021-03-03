@@ -216,7 +216,7 @@ def train_w_ss(model, train_data,test_data, optimizer, latent_rep):
         output_dist += output.flatten().tolist()
         actual += labels.flatten().tolist()
 
-    total_samples = (idx + 1) * len(batch)
+    total_samples = (idx + 1) * len(train_batch)
     try:
         r, _=pearsonr(np.array(actual),np.array(output_dist))
     except ValueError as e:
@@ -235,13 +235,14 @@ def train_w_ss(model, train_data,test_data, optimizer, latent_rep):
     avg_lig_loss = lig_loss / (2*total_samples)
     avg_rot_loss = rot_loss / (total_samples)
     avg_DDG_loss = DDG_loss / (total_samples)
+    avg_ss_loss = ss_loss / total_samples
     tmp = avg_loss
-    avg_loss = (tmp,avg_lig_loss,avg_DDG_loss,avg_rot_loss, ss_loss)
+    avg_loss = (tmp, avg_lig_loss, avg_DDG_loss, avg_rot_loss, avg_ss_loss)
     rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
     tmp = rmse
     rmse = (rmse, rmse_ligs)
-    both_calc_distr = (output_dist,lig_pred)
-    both_labels = (actual,lig_labels)
+    both_calc_distr = (output_dist, lig_pred)
+    both_labels = (actual, lig_labels)
     return avg_loss, both_calc_distr, r, rmse, both_labels
 
 def train_rotation(model, ss_data, optimizer, latent_rep):
@@ -254,7 +255,7 @@ def train_rotation(model, ss_data, optimizer, latent_rep):
         optimizer.zero_grad()
         if latent_rep:
             ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
+            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
             rotation_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2)
             rotation_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
         else:
@@ -360,8 +361,16 @@ def test(model, test_data, latent_rep,test_recs_split=None):
     both_labels = (actual, lig_labels)
     return avg_loss, both_calc_distr, r, rmse, both_labels, r_ave, r_per_rec
 
+# Make helper function to make meaningful tags
+def make_tags(args):
+    addnl_tags = []
+    addnl_tags.append(args.use_model)
+    if 'full_bdb' in args.ligtr:
+        addnl_tags.append('full_BDB')
+    return addnl_tags
 
-tgs = ['two_legged'] + args.tags
+
+tgs = make_tags(args) + args.tags
 wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
 
 if args.use_model == 'multtask_latent_def2018':
@@ -453,7 +462,8 @@ print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest
 for epoch in range(1, epochs+1):
     # if args.self_supervised_test:
     #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
-    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
+    # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
+    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train_w_ss(model, traine, teste, optimizer, latent_rep)
     tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep)
     if args.absolute_dg_loss:
         scheduler.step(tr_loss[0])
@@ -518,6 +528,7 @@ for epoch in range(1, epochs+1):
         "Avg Train Loss DDG": tr_loss[2],
         "Avg Test Loss DDG": tt_loss[2],
         "Avg Train Loss Rotation": tr_loss[3],
+        "Avg Self-Supervised Train Loss Rotation": tr_loss[4],
         "Avg Test Loss Rotation": tt_loss[3],
         "Train R AbsAff": float(tr_r[1]),
         "Test R AbsAff": float(tt_r[1]),
