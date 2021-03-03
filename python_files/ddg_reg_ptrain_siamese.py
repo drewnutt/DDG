@@ -539,9 +539,6 @@ for epoch in range(1, epochs+1):
     if not epoch % 50:
             torch.save(model.state_dict(), "model.h5")
             wandb.save('model.h5')
-            combined_data = np.array([out_d,tt_act]).T
-            np.savetxt("out_actual_ddg.csv", combined_data, delimiter=",")
-            wandb.save("out_actual_ddg.csv")
 torch.save(model.state_dict(), "model.h5")
 wandb.save('model.h5')
 print("Final Train Distribution: Mean={:.4f}, Var={:.4f}".format(np.mean(out_dist),np.var(out_dist)))
