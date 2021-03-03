@@ -150,6 +150,31 @@ def train_w_ss(model, train_data,test_data, optimizer, latent_rep):
     output_dist, actual = [], []
     lig_pred, lig_labels = [], []
     for idx, (train_batch,test_batch)  in enumerate(zip(train_data,test_data)):
+        # Now do a batch of the self-supervised training on the unlabelled test data
+        optimizer.zero_grad()
+        gmaker.forward(test_batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
+        gmaker.forward(test_batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
+        if latent_rep:
+            output, lig1, lig2, lig1_rep, lig2_rep = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+            ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
+            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
+            self_super_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2)
+            self_super_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
+        else:
+            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
+            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
+            self_super_loss = dgrotloss1(dg1_lig1, dg2_lig1)
+            self_super_loss += dgrotloss2(dg1_lig2, dg2_lig2)
+        self_super_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda')) 
+        self_super_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda')) 
+        ss_loss += self_super_loss 
+        self_super_loss.backward()
+        if args.clip > 0:
+            nn.utils.clip_grad_norm_(model.parameters(),args.clip)
+        optimizer.step()
+
+        #now do a batch of actual training with labels
         gmaker.forward(train_batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
         gmaker.forward(train_batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
         train_batch.extract_label(1, float_labels)
@@ -189,29 +214,6 @@ def train_w_ss(model, train_data,test_data, optimizer, latent_rep):
         optimizer.step()
 
 
-        # Now do a batch of the self-supervised training on the unlabelled test data
-        optimizer.zero_grad()
-        gmaker.forward(test_batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-        gmaker.forward(test_batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        if latent_rep:
-            output, lig1, lig2, lig1_rep, lig2_rep = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            self_super_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2)
-            self_super_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
-        else:
-            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            self_super_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-            self_super_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-        self_super_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        self_super_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        ss_loss += self_super_loss 
-        self_super_loss.backward()
-        if args.clip > 0:
-            nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-        optimizer.step()
 
         output_dist += output.flatten().tolist()
         actual += labels.flatten().tolist()
