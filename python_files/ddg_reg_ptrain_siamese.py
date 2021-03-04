@@ -363,6 +363,7 @@ def test(model, test_data, latent_rep,test_recs_split=None):
     both_labels = (actual, lig_labels)
     return avg_loss, both_calc_distr, r, rmse, both_labels, r_ave, r_per_rec
 
+
 # Make helper function to make meaningful tags
 def make_tags(args):
     addnl_tags = []
@@ -391,6 +392,8 @@ traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr,
 traine.populate(args.trainfile)
 teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.SmallEpoch)
 teste.populate(args.testfile)
+ss_test = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
+ss_test.populate(args.testfile)
 # To compute the "average" pearson R per receptor, count the number of pairs for each rec then iterate over that number later during test time
 # test_exs_per_rec=dict()
 # with open(args.testfile) as test_types:
@@ -465,7 +468,7 @@ for epoch in range(1, epochs+1):
     # if args.self_supervised_test:
     #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
     # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
-    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train_w_ss(model, traine, teste, optimizer, latent_rep)
+    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train_w_ss(model, traine, ss_test, optimizer, latent_rep)
     tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep)
     if args.absolute_dg_loss:
         scheduler.step(tr_loss[0])
