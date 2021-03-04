@@ -149,9 +149,10 @@ def train_w_ss(model, train_data,test_data, optimizer, latent_rep):
 
     output_dist, actual = [], []
     lig_pred, lig_labels = [], []
-    for idx, (train_batch,test_batch)  in enumerate(zip(train_data,test_data)):
+    for idx, train_batch in enumerate(train_data):
         # Now do a batch of the self-supervised training on the unlabelled test data
         optimizer.zero_grad()
+        test_batch = test_data.next_batch()
         gmaker.forward(test_batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
         gmaker.forward(test_batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
         if latent_rep:
