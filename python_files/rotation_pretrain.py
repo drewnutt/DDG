@@ -409,7 +409,8 @@ for epoch in range(1,epochs+1):
     tr_loss, out_dist, tr_r, tr_rmse, tr_act = train_w_ss(model, traine, ss_test, optimizer, latent_rep)
     tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste,latent_rep)
 
-    wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
+    wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d[0]))}, commit=False)
+    wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist[0]))}, commit=False)
     if epoch % 10 == 0: # only log the graphs every 10 epochs, make things a bit faster
         fig = plt.figure(1)
         fig.clf()
