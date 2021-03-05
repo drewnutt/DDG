@@ -393,7 +393,7 @@ if args.absolute_dg_loss:
 
 wandb.watch(model,log='all')
 print('extra stats:{}'.format(args.extra_stats))
-tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste)
+tt_loss, out_d, tt_r, tt_rmse,tt_act, tt_rave,tt_r_per_rec = test(model, teste,latent_rep)
 wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d))}, commit=False)
 wandb.log({
     "Avg Test Loss Total": tt_loss[0],
