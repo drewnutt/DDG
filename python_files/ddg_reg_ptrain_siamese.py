@@ -69,7 +69,7 @@ def weights_init(m):
         if m.bias is not None:
             init.constant_(m.bias.data, 0)
 
-def train(model, traine, optimizer, latent_rep):
+def train(model, traine, test_data, optimizer, latent_rep):
     model.train()
     full_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
 
