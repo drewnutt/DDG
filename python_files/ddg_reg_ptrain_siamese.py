@@ -476,6 +476,7 @@ def make_tags(args):
     addnl_tags.append(args.use_model)
     if 'full_bdb' in args.ligtr:
         addnl_tags.append('full_BDB')
+    addnl_tags.append(args.train_type)
     return addnl_tags
 
 
