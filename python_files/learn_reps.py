@@ -43,12 +43,12 @@ class Projector(nn.Module):
         return self.lastlayer(x)
 
 class ContrastiveLoss(nn.Module):
-   def __init__(self, batch_size, temperature=0.5):
+   def __init__(self,device, batch_size, temperature=0.5):
        super().__init__()
-       self.batch_size = batch_size
+       self.batch_size = int(batch_size)
        self.register_buffer("temperature", torch.tensor(temperature))
-       self.register_buffer("negatives_mask", (~torch.eye(batch_size * 2, batch_size * 2, dtype=bool)).float())
-          
+       self.register_buffer("negatives_mask", (~torch.eye(int(batch_size) * 2, int(batch_size) * 2, dtype=bool)).float())
+       print(self.negatives_mask)
 
    def forward(self, emb_i, emb_j):
        """
@@ -65,10 +65,11 @@ class ContrastiveLoss(nn.Module):
        sim_ji = torch.diag(similarity_matrix, -self.batch_size)
        positives = torch.cat([sim_ij, sim_ji], dim=0)
       
-       nominator = torch.exp(positives / self.temperature)
-       denominator = self.negatives_mask * torch.exp(similarity_matrix / self.temperature)
+       numerator = torch.exp(positives / self.temperature)
+       tmp = torch.exp(similarity_matrix / self.temperature)
+       denominator = self.negatives_mask * tmp
   
-       loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
+       loss_partial = -torch.log(numerator / torch.sum(denominator, dim=1))
        loss = torch.sum(loss_partial) / (2 * self.batch_size)
        return loss
 
@@ -86,7 +87,8 @@ def train(enc_model,proj_model, train_data, optimizers):
     for idx, batch in enumerate(train_data):
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        optimizer.zero_grad()
+        optimizers[0].zero_grad()
+        optimizers[1].zero_grad()
         proj_1 = proj_model(enc_model(input_tensor_1))
         proj_2 = proj_model(enc_model(input_tensor_2))
         loss = criterion(proj_1,proj_2)
@@ -170,6 +172,7 @@ if args.solver == "adam":
     optimizerB = optim.Adam(projector.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 optimizers= [optimizerA, optimizerB]
 criterion = ContrastiveLoss(batch_size, args.temperature)
+criterion.to('cuda')
 
 
 input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
