@@ -43,12 +43,11 @@ class Projector(nn.Module):
         return self.lastlayer(x)
 
 class ContrastiveLoss(nn.Module):
-   def __init__(self,device, batch_size, temperature=0.5):
+   def __init__(self, batch_size, temperature=0.5):
        super().__init__()
        self.batch_size = int(batch_size)
-       self.register_buffer("temperature", torch.tensor(temperature))
-       self.register_buffer("negatives_mask", (~torch.eye(int(batch_size) * 2, int(batch_size) * 2, dtype=bool)).float())
-       print(self.negatives_mask)
+       self.temperature = torch.tensor(temperature).to('cuda')
+       self.negatives_mask = ((~torch.eye(self.batch_size * 2, self.batch_size * 2, dtype=bool)).float()).to('cuda')
 
    def forward(self, emb_i, emb_j):
        """
@@ -66,8 +65,7 @@ class ContrastiveLoss(nn.Module):
        positives = torch.cat([sim_ij, sim_ji], dim=0)
       
        numerator = torch.exp(positives / self.temperature)
-       tmp = torch.exp(similarity_matrix / self.temperature)
-       denominator = self.negatives_mask * tmp
+       denominator = self.negatives_mask * torch.exp(similarity_matrix / self.temperature)
   
        loss_partial = -torch.log(numerator / torch.sum(denominator, dim=1))
        loss = torch.sum(loss_partial) / (2 * self.batch_size)
@@ -114,7 +112,7 @@ tgs = ['LearningReps'] + args.tags
 # wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
 
 #Parameters that are not important for hyperparameter sweep
-batch_size = 64
+batch_size = 2
 epochs = args.epoch
 
 # print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
