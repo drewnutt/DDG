@@ -71,6 +71,7 @@ def train(model, train_data, optimizer):
         loss = criterion(proj_1.to('cpu'), proj_2.to('cpu'))
         loss.backward()
         optimizer.step()
+        full_loss += loss
 
     total_samples = (idx + 1) * len(batch)
     avg_loss = full_loss / total_samples
@@ -87,10 +88,10 @@ def make_tags(args):
 
 
 tgs = ['LearningReps'] + args.tags
-# wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
+wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
 
 #Parameters that are not important for hyperparameter sweep
-batch_size = 2
+batch_size = 128
 epochs = args.epoch
 
 # print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
@@ -147,15 +148,15 @@ criterion = ContrastiveLoss(batch_size, args.temperature)
 input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 input_tensor_2 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 
-# wandb.watch(model, log='all')
+wandb.watch(model, log='all')
 print('training now')
 for epoch in range(1, epochs+1):
     tr_loss = train(model, traine, optimizer)
 
-    # wandb.log({
-    #     "Avg Train Loss AbsAff": tr_loss})
+    wandb.log({
+        "Avg Train Loss AbsAff": tr_loss})
     if not epoch % 50:
             torch.save(encoder.state_dict(), "model.h5")
-            # wandb.save('model.h5')
+            wandb.save('model.h5')
 torch.save(model.state_dict(), "model.h5")
-# wandb.save('model.h5')
+wandb.save('model.h5')
