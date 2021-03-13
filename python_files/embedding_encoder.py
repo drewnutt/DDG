@@ -57,9 +57,9 @@ class Encoder(nn.Module):
 class Projector(nn.Module):
     def __init__(self,firstdim):
         super(Projector,self).__init__()
-        self.firstlayer = nn.Linear(firstdim,firstdim)
+        self.firstlayer = nn.Linear(firstdim,1024)
         self.func = F.relu
-        self.lastlayer = nn.Linear(firstdim,128)
+        self.lastlayer = nn.Linear(1024,128)
 
     def forward(self,x):
         x = self.func(self.firstlayer(x))
