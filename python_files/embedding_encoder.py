@@ -8,9 +8,9 @@ class View(nn.Module):
         def forward(self, input):
                 return input.view(*self.shape)
 
-class Net(nn.Module):
+class Encoder(nn.Module):
         def __init__(self, dims):
-                super(Net, self).__init__()
+                super(Encoder, self).__init__()
                 self.modules = []
                 nchannels = dims[0]
 
@@ -42,18 +42,35 @@ class Net(nn.Module):
                 self.modules.append(conv5)
                 div = 2*2*2
                 last_size = int(dims[1]//div * dims[2]//div * dims[3]//div * 128)
-                print(last_size)
+                self.last_size = last_size
                 flattener = View((-1,last_size))
                 self.add_module('flatten',flattener)
                 self.modules.append(flattener)
 
-        def forward_one(self, x): 
+        def forward(self, x): 
                 for layer in self.modules:
                         x= layer(x)
                         if isinstance(layer,nn.Conv3d):
                                 x=self.func(x)
                 return x
 
-        def forward(self,x1):
-                lig1 = self.forward_one(x1)
-                return lig1
+class Projector(nn.Module):
+    def __init__(self,firstdim):
+        super(Projector,self).__init__()
+        self.firstlayer = nn.Linear(firstdim,firstdim)
+        self.func = F.relu
+        self.lastlayer = nn.Linear(firstdim,128)
+
+    def forward(self,x):
+        x = self.func(self.firstlayer(x))
+        return self.lastlayer(x)
+
+class Net(nn.Module):
+    def __init__(self,dims):
+        super(Net,self).__init__()
+        self.encoder = Encoder(dims)
+        self.projector = Projector(self.encoder.last_size)
+
+    def forward(self, x):
+        x = self.encoder(x)
+        return self.projector(x)

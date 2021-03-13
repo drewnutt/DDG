@@ -31,45 +31,26 @@ args = parser.parse_args()
 
 from embedding_encoder import Net
 
-class Projector(nn.Module):
-    def __init__(self,firstdim):
-        super(Projector,self).__init__()
-        self.firstlayer = nn.Linear(firstdim,firstdim)
-        self.func = F.relu
-        self.lastlayer = nn.Linear(firstdim,128)
+class ContrastiveLoss(nn.Module):      
+    def __init__(self, batch_size, temperature=0.5):      
+        super().__init__()      
+        self.batch_size = int(batch_size)      
+        self.temperature = torch.tensor(temperature)
+        self.negatives_mask = ((~torch.eye(self.batch_size * 2, self.batch_size * 2, dtype=bool)).float())
 
-    def forward(self,x):
-        x = self.func(self.firstlayer(x))
-        return self.lastlayer(x)
+    def forward(self, emb_i, emb_j):      
+        """      
+        emb_i and emb_j are batches of embeddings, where corresponding indices are pairs      
+        z_i, z_j as per SimCLR paper      
+        """      
+        representations = torch.cat([F.normalize(emb_i, dim=1),F.normalize(emb_j, dim=1)], dim=0)      
+        similarity_matrix = F.cosine_similarity(representations.unsqueeze(1), representations.unsqueeze(0), dim=2)      
 
-class ContrastiveLoss(nn.Module):
-   def __init__(self, batch_size, temperature=0.5):
-       super().__init__()
-       self.batch_size = int(batch_size)
-       self.temperature = torch.tensor(temperature).to('cuda')
-       self.negatives_mask = ((~torch.eye(self.batch_size * 2, self.batch_size * 2, dtype=bool)).float()).to('cuda')
+        sim_ij = torch.diag(similarity_matrix, self.batch_size)      
+        sim_ji = torch.diag(similarity_matrix, -self.batch_size)      
 
-   def forward(self, emb_i, emb_j):
-       """
-       emb_i and emb_j are batches of embeddings, where corresponding indices are pairs
-       z_i, z_j as per SimCLR paper
-       """
-       z_i = F.normalize(emb_i, dim=1)
-       z_j = F.normalize(emb_j, dim=1)
-
-       representations = torch.cat([z_i, z_j], dim=0)
-       similarity_matrix = F.cosine_similarity(representations.unsqueeze(1), representations.unsqueeze(0), dim=2)
-      
-       sim_ij = torch.diag(similarity_matrix, self.batch_size)
-       sim_ji = torch.diag(similarity_matrix, -self.batch_size)
-       positives = torch.cat([sim_ij, sim_ji], dim=0)
-      
-       numerator = torch.exp(positives / self.temperature)
-       denominator = self.negatives_mask * torch.exp(similarity_matrix / self.temperature)
-  
-       loss_partial = -torch.log(numerator / torch.sum(denominator, dim=1))
-       loss = torch.sum(loss_partial) / (2 * self.batch_size)
-       return loss
+        loss_partial = -torch.log(torch.exp(torch.cat([sim_ij, sim_ji], dim=0) / self.temperature) / torch.sum(self.negatives_mask * torch.exp(similarity_matrix / self.temperature), dim=1))      
+        return torch.sum(loss_partial) / (2 * self.batch_size)
 
 def weights_init(m):
     if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
@@ -77,22 +58,19 @@ def weights_init(m):
         if m.bias is not None:
             init.constant_(m.bias.data, 0)
 
-def train(enc_model,proj_model, train_data, optimizers):
-    proj_model.train()
-    enc_model.train()
+def train(model, train_data, optimizer):
+    model.train()
     full_loss = 0
 
     for idx, batch in enumerate(train_data):
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        optimizers[0].zero_grad()
-        optimizers[1].zero_grad()
-        proj_1 = proj_model(enc_model(input_tensor_1))
-        proj_2 = proj_model(enc_model(input_tensor_2))
-        loss = criterion(proj_1,proj_2)
+        optimizer.zero_grad()
+        proj_1 = model(input_tensor_1)
+        proj_2 = model(input_tensor_2)
+        loss = criterion(proj_1.to('cpu'), proj_2.to('cpu'))
         loss.backward()
-        optimizers[1].step()
-        optimizers[0].step()
+        optimizer.step()
 
     total_samples = (idx + 1) * len(batch)
     avg_loss = full_loss / total_samples
@@ -142,12 +120,9 @@ dims = gmaker.grid_dimensions(14*2)  # only one rec+onelig per example
 tensor_shape = (batch_size,)+dims
 
 actual_dims = (dims[0], *dims[1:])
-encoder = Net(actual_dims)
-projector = Projector(27648)
-encoder.to('cuda:0')
-projector.to('cuda:0')
-encoder.apply(weights_init)
-projector.apply(weights_init)
+model = Net(actual_dims)
+model.to('cuda:0')
+model.apply(weights_init)
 
 # if args.use_weights is not None:  # using the weights from an external source, only some of the network layers need to be the same
 #     print('about to use weights')
@@ -163,14 +138,10 @@ projector.apply(weights_init)
 #             param.requires_grad = False
     
 
-optimizerA = optim.SGD(encoder.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-optimizerB = optim.SGD(projector.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 if args.solver == "adam":
-    optimizerA = optim.Adam(encoder.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    optimizerB = optim.Adam(projector.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-optimizers= [optimizerA, optimizerB]
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 criterion = ContrastiveLoss(batch_size, args.temperature)
-criterion.to('cuda')
 
 
 input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
@@ -179,7 +150,7 @@ input_tensor_2 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 # wandb.watch(model, log='all')
 print('training now')
 for epoch in range(1, epochs+1):
-    tr_loss = train(encoder, projector, traine, optimizers)
+    tr_loss = train(model, traine, optimizer)
 
     # wandb.log({
     #     "Avg Train Loss AbsAff": tr_loss})
