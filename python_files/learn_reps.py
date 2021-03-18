@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--ligtr', required=True, help='location of training ligand cache file input')
 parser.add_argument('--rectr', required=True,help='location of training receptor cache file input')
 parser.add_argument('--trainfile', required=True, help='location of training information')
+parser.add_argument('--dataroot', required=True, help='directory to use as root for training ExampleProvider')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
 parser.add_argument('--solver', default="adam", choices=('adam','sgd'), type=str, help="solver to use")
@@ -27,16 +28,17 @@ parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb ru
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
 parser.add_argument('--temperature','-t',default=0.5,type=float,help='temperature parameter of the NT-Xent Loss')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
+parser.add_argument('--batch_size',default=128,type=int,help='batch size to use')
 args = parser.parse_args()
 
 from embedding_encoder import Net
 
 class ContrastiveLoss(nn.Module):      
-    def __init__(self, batch_size, temperature=0.5):      
+    def __init__(self, batch_size, temperature=0.5,device='cpu'):      
         super().__init__()      
         self.batch_size = int(batch_size)      
-        self.temperature = torch.tensor(temperature)
-        self.negatives_mask = ((~torch.eye(self.batch_size * 2, self.batch_size * 2, dtype=bool)).float())
+        self.temperature = torch.tensor(temperature).to(device)
+        self.negatives_mask = ((~torch.eye(self.batch_size * 2, self.batch_size * 2, dtype=bool)).float()).to(device)
 
     def forward(self, emb_i, emb_j):      
         """      
@@ -63,12 +65,12 @@ def train(model, train_data, optimizer):
     full_loss = 0
 
     for idx, batch in enumerate(train_data):
+        optimizer.zero_grad()
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        optimizer.zero_grad()
         proj_1 = model(input_tensor_1)
         proj_2 = model(input_tensor_2)
-        loss = criterion(proj_1.to('cpu'), proj_2.to('cpu'))
+        loss = criterion(proj_1, proj_2)
         loss.backward()
         optimizer.step()
         full_loss += loss
@@ -91,38 +93,23 @@ tgs = ['LearningReps'] + args.tags
 wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
 
 #Parameters that are not important for hyperparameter sweep
-batch_size = 128
 epochs = args.epoch
+batch_size = args.batch_size
 
-# print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
-
-
-
-traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, shuffle=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.SmallEpoch)
+traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr,data_root=args.dataroot, shuffle=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.SmallEpoch)
 traine.populate(args.trainfile)
-# To compute the "average" pearson R per receptor, count the number of pairs for each rec then iterate over that number later during test time
-# test_exs_per_rec=dict()
-# with open(args.testfile) as test_types:
-#     count = 0
-#     rec = ''
-#     for lineuse a loss function (and model architecture) that utilizes the absolute binding affinity in test_types:
-#         line_args = line.split(' ')
-#         newrec = re.findall(r'([A-Z0-9]{4})/',line_args[4])[0]
-#         if newrec != rec:
-#             if count > 0:
-#                 test_exs_per_rec[rec] = count
-#                 count = 1
-#             rec = newrec
-#         else:
-#             count += 1
 
 gmaker = molgrid.GridMaker(binary=args.binary_rep)
 dims = gmaker.grid_dimensions(14*2)  # only one rec+onelig per example
 tensor_shape = (batch_size,)+dims
 
 actual_dims = (dims[0], *dims[1:])
-model = Net(actual_dims)
-model.to('cuda:0')
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+if torch.cuda.device_count() > 1:
+    print(f"Using {torch.cuda.device_count()} GPUs")
+    model = nn.DataParallel(Net(actual_dims)).to(device)
+else:
+    model = Net(actual_dims).to(device)
 model.apply(weights_init)
 
 # if args.use_weights is not None:  # using the weights from an external source, only some of the network layers need to be the same
@@ -142,21 +129,28 @@ model.apply(weights_init)
 optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 if args.solver == "adam":
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-criterion = ContrastiveLoss(batch_size, args.temperature)
+criterion = ContrastiveLoss(batch_size, args.temperature, device=device)
 
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=0.001, verbose=True)
 
-input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
-input_tensor_2 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
+input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device=device)
+input_tensor_2 = torch.zeros(tensor_shape, dtype=torch.float32, device=device)
 
 wandb.watch(model, log='all')
 print('training now')
 for epoch in range(1, epochs+1):
     tr_loss = train(model, traine, optimizer)
 
+    scheduler.step(tr_loss)
+
     wandb.log({
         "Avg Train Loss AbsAff": tr_loss})
     if not epoch % 50:
-            torch.save(encoder.state_dict(), "model.h5")
+            torch.save(model.state_dict(), "model.h5")
             wandb.save('model.h5')
 torch.save(model.state_dict(), "model.h5")
+try:
+    torch.save(model.encoder.state_dict(), "encoder-only.pt")
+except:
+    print('canot save just the encoder')
 wandb.save('model.h5')
