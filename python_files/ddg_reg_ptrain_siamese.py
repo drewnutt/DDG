@@ -45,7 +45,7 @@ parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help
 parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
 parser.add_argument('--ddg_loss_weight','-D',default=1.0,type=float,help='weight to use in adding the DDG loss terms to the other losses (default: %(default)d')
 parser.add_argument('--train_type',default='no_SS', choices=['no_SS','SS_simult_before','SS_simult_after'],help='what type of training loop to use')
-parser.add_argument('--latent_loss',default='mse', choices=['mse','covar'],help='what type of loss to apply to the latent representations')
+parser.add_argument('--latent_loss',default='mse', choices=['mse','corr'],help='what type of loss to apply to the latent representations')
 parser.add_argument('--crosscorr_lambda',default=5E-3, type=float, help='lambda value to use in the Cross Correlation Loss')
 crosscorr_lambda
 args = parser.parse_args()
@@ -499,6 +499,7 @@ def make_tags(args):
     if 'full_bdb' in args.ligtr:
         addnl_tags.append('full_BDB')
     addnl_tags.append(args.train_type)
+    addnl_tags.append('{args.latent_loss.title()}Loss')
     return addnl_tags
 
 
