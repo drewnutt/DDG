@@ -45,6 +45,9 @@ parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help
 parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
 parser.add_argument('--ddg_loss_weight','-D',default=1.0,type=float,help='weight to use in adding the DDG loss terms to the other losses (default: %(default)d')
 parser.add_argument('--train_type',default='no_SS', choices=['no_SS','SS_simult_before','SS_simult_after'],help='what type of training loop to use')
+parser.add_argument('--latent_loss',default='mse', choices=['mse','covar'],help='what type of loss to apply to the latent representations')
+parser.add_argument('--crosscorr_lambda',default=5E-3, type=float, help='lambda value to use in the Cross Correlation Loss')
+crosscorr_lambda
 args = parser.parse_args()
 
 print(args.absolute_dg_loss, args.use_model)
@@ -68,6 +71,25 @@ def weights_init(m):
         init.xavier_uniform_(m.weight.data)
         if m.bias is not None:
             init.constant_(m.bias.data, 0)
+
+class CrossCorrLoss(nn.Module):    
+    def __init__(self, rep_size, lambd):    
+        super(CrossCorrLoss,self).__init__()    
+        self.bn = nn.BatchNorm1d(rep_size, affine=False)    
+    
+        self.lambd = lambd    
+        
+    def forward(self, z1, z2):    
+        c = self.bn(z1).T @ self.bn(z2)    
+        on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()    
+            
+        n, m = c.shape    
+        assert n == m    
+        off_diagonals = c.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()    
+        off_diag = off_diagonals.pow_(2).sum()    
+           
+        loss = on_diag + self.lambd * off_diag    
+        return loss
 
 def train(model, traine, test_data, optimizer, latent_rep):
     model.train()
@@ -555,17 +577,26 @@ if args.freeze_arms:
             print(name)
             param.requires_grad = False
     
-
 optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 if args.solver == "adam":
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 criterion = nn.MSELoss()
 criterion_lig1 = nn.MSELoss()
 criterion_lig2 = nn.MSELoss()
+# Not sure if these are replaceable with the Barlow Twins loss
 ddgrotloss1 = nn.MSELoss()
 ddgrotloss2 = nn.MSELoss()
-dgrotloss1 = nn.MSELoss()
-dgrotloss2 = nn.MSELoss()
+if args.latent_loss == 'mse'
+    dgrotloss1 = nn.MSELoss()
+    dgrotloss2 = nn.MSELoss()
+elif latent_rep: ## only other option is 'covar' for the Barlow Twins approach, but requires latent rep
+    _,_,_,rep1,rep2 = model(torch.rand(tensor_shape, device='cuda')[:, :28, :, :, :], torch.rand(tensor_shape,device='cuda')[:, 28:, :, :, :])
+    rep_size = rep1.shape[-1]
+    print(rep_size)
+    assert rep_size == rep2.shape[-1]
+    dgrotloss1 = nn.CrossCorrLoss(rep_size,args.crosscorr_lambda)
+    dgrotloss2 = nn.CrossCorrLoss(rep_size,args.crosscorr_lambda)
+
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=0.001, verbose=True)
 
