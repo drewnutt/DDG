@@ -47,7 +47,6 @@ parser.add_argument('--ddg_loss_weight','-D',default=1.0,type=float,help='weight
 parser.add_argument('--train_type',default='no_SS', choices=['no_SS','SS_simult_before','SS_simult_after'],help='what type of training loop to use')
 parser.add_argument('--latent_loss',default='mse', choices=['mse','corr'],help='what type of loss to apply to the latent representations')
 parser.add_argument('--crosscorr_lambda',default=5E-3, type=float, help='lambda value to use in the Cross Correlation Loss')
-crosscorr_lambda
 args = parser.parse_args()
 
 print(args.absolute_dg_loss, args.use_model)
@@ -73,9 +72,9 @@ def weights_init(m):
             init.constant_(m.bias.data, 0)
 
 class CrossCorrLoss(nn.Module):    
-    def __init__(self, rep_size, lambd):    
+    def __init__(self, rep_size, lambd, device='cpu'):    
         super(CrossCorrLoss,self).__init__()    
-        self.bn = nn.BatchNorm1d(rep_size, affine=False)    
+        self.bn = nn.BatchNorm1d(rep_size, affine=False).to(device)    
     
         self.lambd = lambd    
         
@@ -499,7 +498,7 @@ def make_tags(args):
     if 'full_bdb' in args.ligtr:
         addnl_tags.append('full_BDB')
     addnl_tags.append(args.train_type)
-    addnl_tags.append('{args.latent_loss.title()}Loss')
+    addnl_tags.append(f'{args.latent_loss.title()}Loss')
     return addnl_tags
 
 
@@ -587,7 +586,7 @@ criterion_lig2 = nn.MSELoss()
 # Not sure if these are replaceable with the Barlow Twins loss
 ddgrotloss1 = nn.MSELoss()
 ddgrotloss2 = nn.MSELoss()
-if args.latent_loss == 'mse'
+if args.latent_loss == 'mse':
     dgrotloss1 = nn.MSELoss()
     dgrotloss2 = nn.MSELoss()
 elif latent_rep: ## only other option is 'covar' for the Barlow Twins approach, but requires latent rep
@@ -595,8 +594,8 @@ elif latent_rep: ## only other option is 'covar' for the Barlow Twins approach, 
     rep_size = rep1.shape[-1]
     print(rep_size)
     assert rep_size == rep2.shape[-1]
-    dgrotloss1 = nn.CrossCorrLoss(rep_size,args.crosscorr_lambda)
-    dgrotloss2 = nn.CrossCorrLoss(rep_size,args.crosscorr_lambda)
+    dgrotloss1 = CrossCorrLoss(rep_size,args.crosscorr_lambda,device='cuda')
+    dgrotloss2 = CrossCorrLoss(rep_size,args.crosscorr_lambda,device='cuda')
 
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=0.001, verbose=True)
