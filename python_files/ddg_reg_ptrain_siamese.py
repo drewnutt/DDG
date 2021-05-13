@@ -33,7 +33,6 @@ parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use ba
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
-parser.add_argument('--extra_stats',default=False,action='store_true',help='keep statistics about per receptor R values') 
 parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
@@ -433,7 +432,7 @@ def train_rotation(model, ss_data, optimizer, latent_rep):
     avg_loss = full_loss/(total_samples)
     return avg_loss
 
-def test(model, test_data, latent_rep,test_recs_split=None,proj=None):
+def test(model, test_data, latent_rep,proj=None):
     model.eval()
     test_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
 
@@ -485,20 +484,6 @@ def test(model, test_data, latent_rep,test_recs_split=None,proj=None):
 
     total_samples = (idx + 1) * len(batch) 
 
-    # Calculating "Average" Pearson's R across each receptor
-    if test_recs_split is not None:
-        last_val,r_ave= 0,0
-        r_per_rec = dict()
-        for test_rec, test_count in test_recs_split.items():
-            r_rec, _ = pearsonr(np.array(actual[last_val:last_val+test_count]),np.array(output_dist[last_val:last_val+test_count]))
-            r_per_rec[test_rec]=r_rec
-            r_ave += r_rec
-            last_val += test_count
-        r_ave /= len(test_recs_split)
-    else:
-        r_ave = 0
-        r_per_rec = 0
-
     try:
         r,_=pearsonr(np.array(actual),np.array(output_dist))
     except ValueError as e:
@@ -524,7 +509,7 @@ def test(model, test_data, latent_rep,test_recs_split=None,proj=None):
     rmse = (rmse, rmse_ligs)
     both_calc_distr = (output_dist, lig_pred)
     both_labels = (actual, lig_labels)
-    return avg_loss, both_calc_distr, r, rmse, both_labels, r_ave, r_per_rec
+    return avg_loss, both_calc_distr, r, rmse, both_labels
 
 
 # Make helper function to make meaningful tags
@@ -559,21 +544,6 @@ teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, 
 teste.populate(args.testfile)
 ss_test = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
 ss_test.populate(args.testfile)
-# To compute the "average" pearson R per receptor, count the number of pairs for each rec then iterate over that number later during test time
-# test_exs_per_rec=dict()
-# with open(args.testfile) as test_types:
-#     count = 0
-#     rec = ''
-#     for lineuse a loss function (and model architecture) that utilizes the absolute binding affinity in test_types:
-#         line_args = line.split(' ')
-#         newrec = re.findall(r'([A-Z0-9]{4})/',line_args[4])[0]
-#         if newrec != rec:
-#             if count > 0:
-#                 test_exs_per_rec[rec] = count
-#                 count = 1
-#             rec = newrec
-#         else:
-#             count += 1
 
 gmaker = molgrid.GridMaker(binary=args.binary_rep)
 dims = gmaker.grid_dimensions(14*4)  # only one rec+onelig per example
@@ -665,7 +635,7 @@ for epoch in range(1, epochs+1):
     #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
     # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
     tr_loss, out_dist, tr_r, tr_rmse, tr_act = train_func(model, traine, ss_test, optimizer, latent_rep,proj=projector)
-    tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep,proj=projector)
+    tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep,proj=projector)
     if args.absolute_dg_loss:
         scheduler.step(tr_loss[0])
     else:
@@ -698,22 +668,6 @@ for epoch in range(1, epochs+1):
         plt.xlabel('Actual affinity')
         plt.ylabel('Predicted affinity')
         wandb.log({"Actual vs. Predicted Affinity (Test)": test_absaff_fig}, commit=False)
-        if args.extra_stats:
-            rperr_fig = plt.figure(3)
-            rperr_fig.clf()
-            sorted_test_rperrec = dict(sorted(tt_r_per_rec.items(), key=lambda item: item[0]))
-            rec_pdbs, rvals = list(sorted_test_rperrec.keys()),list(sorted_test_rperrec.values())
-            plt.bar(list(range(len(rvals))),rvals,tick_label=rec_pdbs)
-            plt.ylabel("Pearson's R value")
-            wandb.log({"R Value Per Receptor (Test)": rperr_fig},commit=False)
-            rvsnligs_fig=plt.figure(4)
-            rvsnligs_fig.clf()
-            sorted_num_ligs = dict(sorted(test_exs_per_rec.items(),key=lambda item: item[0]))
-            num_ligs = list(sorted_num_ligs.values())
-            plt.scatter(num_ligs,rvals)
-            plt.xlabel('number of ligands (test)')
-            plt.ylabel("Pearson's R")
-            wandb.log({"R Value Per Num_Ligs (Test)": rvsnligs_fig},commit=False)
 
     print(f'Test/Train AbsAff R:{tt_r[1]:.4f}\t{tr_r[1]:.4f}')
     wandb.log({
@@ -721,7 +675,6 @@ for epoch in range(1, epochs+1):
        "Avg Test Loss Total": tt_loss[0],
        "Train R": tr_r[0],
        "Test R": tt_r[0],
-       #"Test 'Average' R": tt_rave,
        "Train RMSE": tr_rmse[0],
        "Test RMSE": tt_rmse[0],
        "Avg Train Loss AbsAff": tr_loss[1],
