@@ -48,6 +48,7 @@ parser.add_argument('--train_type',default='no_SS', choices=['no_SS','SS_simult_
 parser.add_argument('--latent_loss',default='mse', choices=['mse','corr'],help='what type of loss to apply to the latent representations')
 parser.add_argument('--crosscorr_lambda', type=float, help='lambda value to use in the Cross Correlation Loss')
 parser.add_argument('--proj_size',type=int,default=4096,help='size to project the latent representation to, this is the dimension that the CrossCorrLoss will be applied to (default: %(default)d')
+parser.add_argument('--proj_layers',type=int,default=3,help='how many layers in the projection network, if 0 then there is no projection network(default: %(default)d')
 args = parser.parse_args()
 
 print(args.absolute_dg_loss, args.use_model)
@@ -599,12 +600,16 @@ if args.latent_loss == 'mse':
 elif latent_rep: ## only other option is 'covar' for the Barlow Twins approach, but requires latent rep
     _,_,_,rep1,rep2 = model(torch.rand(tensor_shape, device='cuda')[:, :28, :, :, :], torch.rand(tensor_shape,device='cuda')[:, 28:, :, :, :])
     init_size = rep1.shape[-1]
-    proj_size = 4096 #should make this changeable
-    projector = Projector(init_size,proj_size)
-    projector.to('cuda')
-    projector.apply(weights_init)
-    print(init_size,proj_size)
     assert init_size == rep2.shape[-1]
+    proj_size = args.proj_size 
+    if args.proj_layers:
+        projector = Projector(init_size,proj_size,args.proj_layers)
+        projector.to('cuda')
+        projector.apply(weights_init)
+        print(init_size,proj_size)
+    else:
+        proj_size = init_size
+        print("not using any projector")
     dgrotloss1 = CrossCorrLoss(proj_size,1.0/proj_size,device='cuda')
     dgrotloss2 = CrossCorrLoss(proj_size,1.0/proj_size,device='cuda')
 params = [param for param in model.parameters()]
@@ -625,10 +630,9 @@ lig2_label = torch.zeros(batch_size, dtype=torch.float32)
 
 
 wandb.watch(model, log='all')
-print('extra stats:{}'.format(args.extra_stats))
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
-tt_loss, out_d, tt_r, tt_rmse, tt_act, tt_rave, tt_r_per_rec = test(model, teste, latent_rep, proj=projector)
+tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep, proj=projector)
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}')
 for epoch in range(1, epochs+1):
     # if args.self_supervised_test:
