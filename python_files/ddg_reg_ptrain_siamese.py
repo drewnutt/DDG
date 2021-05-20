@@ -132,27 +132,28 @@ def train(model, traine, test_data, optimizer, latent_rep, proj=None):
         lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
         lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
         if latent_rep:
-            output, lig1, lig2, lig1_rep, lig2_rep = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
+            output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+            output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
+            # ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
+            # ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
             if proj:
-                lig1_selfrep1 = proj(lig1_selfrep1)
-                lig1_selfrep2 = proj(lig1_selfrep2)
-                lig2_selfrep1 = proj(lig2_selfrep1)
-                lig2_selfrep2 = proj(lig2_selfrep2)
-            rotation_loss = dgrotloss1(lig2_selfrep1, lig1_selfrep2)
-            rotation_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
+                lig1_rep1 = proj(lig1_rep1)
+                lig1_rep2 = proj(lig1_rep2)
+                lig2_rep1 = proj(lig2_rep1)
+                lig2_rep2 = proj(lig2_rep2)
+            rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
+            rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
         else:
             output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
             ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
             ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
             rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
             rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
+            rotation_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
+            rotation_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
         loss_lig1 = criterion_lig1(lig1, lig1_labels)
         loss_lig2 = criterion_lig2(lig2, lig2_labels)
         ddg_loss = criterion(output, labels)
-        rotation_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
-        rotation_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
         loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
         lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
         lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
@@ -451,28 +452,29 @@ def test(model, test_data, latent_rep,proj=None):
             lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
             lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
             if latent_rep:
-                output, lig1, lig2, lig1_rep, lig2_rep = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-                ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-                ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
+                output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+                output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
+                # ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
+                # ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
                 if proj:
-                    lig1_selfrep1 = proj(lig1_selfrep1)
-                    lig1_selfrep2 = proj(lig1_selfrep2)
-                    lig2_selfrep1 = proj(lig2_selfrep1)
-                    lig2_selfrep2 = proj(lig2_selfrep2)
-                rotation_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2).to('cuda:0')
-                rotation_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2).to('cuda:0')
+                    lig1_rep1 = proj(lig1_rep1)
+                    lig1_rep2 = proj(lig1_rep2)
+                    lig2_rep1 = proj(lig2_rep1)
+                    lig2_rep2 = proj(lig2_rep2)
+                rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
+                rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
             else:
                 output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
                 ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
                 ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
                 rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
                 rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
+                rotation_loss += ddgrotloss1(ddg_lig1, zero_tensor) 
+                rotation_loss += ddgrotloss2(ddg_lig2, zero_tensor) 
             loss_lig1 = criterion_lig1(lig1, lig1_labels)
             loss_lig2 = criterion_lig2(lig2, lig2_labels)
             ddg_loss = criterion(output, labels)
             zero_tensor = torch.zeros(ddg_lig1.size()).to("cuda:0")
-            rotation_loss += ddgrotloss1(ddg_lig1, zero_tensor) 
-            rotation_loss += ddgrotloss2(ddg_lig2, zero_tensor) 
             loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
@@ -610,8 +612,11 @@ elif latent_rep: ## only other option is 'covar' for the Barlow Twins approach, 
     else:
         proj_size = init_size
         print("not using any projector")
-    dgrotloss1 = CrossCorrLoss(proj_size,1.0/proj_size,device='cuda')
-    dgrotloss2 = CrossCorrLoss(proj_size,1.0/proj_size,device='cuda')
+    crosscorr_lambda = 1.0/proj_size
+    if args.crosscorr_lambda:
+        crosscorr_lambda = args.crosscorr_lambda
+    dgrotloss1 = CrossCorrLoss(proj_size,crosscorr_lambda,device='cuda')
+    dgrotloss2 = CrossCorrLoss(proj_size,crosscorr_lambda,device='cuda')
 params = [param for param in model.parameters()]
 if projector:
     params += [param for param in projector.parameters()]
@@ -620,7 +625,7 @@ if args.solver == "adam":
     optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.weight_decay)
 
 
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, threshold=0.001, verbose=True)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.7, threshold=0.001, patience=20, verbose=True)
 
 input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 input_tensor_2 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
