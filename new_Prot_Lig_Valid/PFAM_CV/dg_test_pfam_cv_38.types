@@ -1,6 +1,5 @@
   4.698970004336019  1XOT_VDN/1XOT_0.gninatypes 1XOT_VDN/1XOT-results_14390.mol2_0.gninatypes 
   5.42021640338319  1XOT_VDN/1XOT_0.gninatypes 1XOT_VDN/1XOT-results_14776.mol2_0.gninatypes 
-  5.0  3DY8_5GP/3DY8_0.gninatypes 3DY8_5GP/3DY8-results_50165771.mol2_0.gninatypes 
   6.2441251443275085  1XMY_ROL/1XMY_0.gninatypes 1XMY_ROL/1XMY-results_14361.mol2_0.gninatypes 
   6.017728766960431  1XMY_ROL/1XMY_0.gninatypes 1XMY_ROL/1XMY-results_14771.mol2_0.gninatypes 
   7.6020599913279625  1XMY_ROL/1XMY_0.gninatypes 1XMY_ROL/1XMY-results_14773.mol2_0.gninatypes 
@@ -88,7 +87,6 @@
   6.2441251443275085  1XLX_CIO/1XLX_0.gninatypes 1XLX_CIO/1XLX-results_14361.mol2_0.gninatypes 
   6.017728766960431  1XLX_CIO/1XLX_0.gninatypes 1XLX_CIO/1XLX-results_14771.mol2_0.gninatypes 
   7.6020599913279625  1XLX_CIO/1XLX_0.gninatypes 1XLX_CIO/1XLX-results_14773.mol2_0.gninatypes 
-  5.698970004336019  3DYS_5GP/3DYS_0.gninatypes 3DYS_5GP/3DYS-results_50296256.mol2_0.gninatypes 
   9.075720713938118  1XM4_PIL/1XM4_0.gninatypes 1XM4_PIL/1XM4-results_14774.mol2_0.gninatypes 
   10.397940008672037  1XM4_PIL/1XM4_0.gninatypes 1XM4_PIL/1XM4-results_14775.mol2_0.gninatypes 
   6.823908740944319  3JSI_WTC/3JSI_0.gninatypes 3JSI_WTC/3JSI-results_50300100.mol2_0.gninatypes 
@@ -186,20 +184,13 @@
   6.376750709602099  1XM6_5RM/1XM6_0.gninatypes 1XM6_5RM/1XM6-results_14772.mol2_0.gninatypes 
   4.698970004336019  1XOS_VIA/1XOS_0.gninatypes 1XOS_VIA/1XOS-results_14390.mol2_0.gninatypes 
   5.42021640338319  1XOS_VIA/1XOS_0.gninatypes 1XOS_VIA/1XOS-results_14776.mol2_0.gninatypes 
-  6.2441251443275085  3DYQ_PCG/3DYQ_0.gninatypes 3DYQ_PCG/3DYQ-results_14776.mol2_0.gninatypes 
-  4.096910013008056  3DYQ_PCG/3DYQ_0.gninatypes 3DYQ_PCG/3DYQ-results_14777.mol2_0.gninatypes 
-  4.096910013008056  3DY8_5GP/3DY8_0.gninatypes 3DY8_5GP/3DY8-results_14777.mol2_0.gninatypes 
   9.1518108830086  1UHO_VDN/1UHO_0.gninatypes 1UHO_VDN/1UHO-results_14776.mol2_0.gninatypes 
   8.886056647693163  1UHO_VDN/1UHO_0.gninatypes 1UHO_VDN/1UHO-results_50111902.mol2_0.gninatypes 
   7.978810700930062  1UHO_VDN/1UHO_0.gninatypes 1UHO_VDN/1UHO-results_50287550.mol2_0.gninatypes 
   9.721246399047171  1SO2_666/1SO2_0.gninatypes 1SO2_666/1SO2-results_15337.mol2_0.gninatypes 
-  7.314258261397736  2WEY_EV1/2WEY_0.gninatypes 2WEY_EV1/2WEY-results_14754.mol2_0.gninatypes 
-  4.096910013008056  3DYS_5GP/3DYS_0.gninatypes 3DYS_5GP/3DYS-results_14777.mol2_0.gninatypes 
   8.853871964321762  3JSI_WTC/3JSI_0.gninatypes 3JSI_WTC/3JSI-results_50300099.mol2_0.gninatypes 
-  8.259637310505756  2H42_VIA/2H42_0.gninatypes 2H42_VIA/2H42-results_14390.mol2_0.gninatypes 
   7.978810700930062  2H42_VIA/2H42_0.gninatypes 2H42_VIA/2H42-results_50287550.mol2_0.gninatypes 
   8.853871964321762  3JSW_JAR/3JSW_0.gninatypes 3JSW_JAR/3JSW-results_50300099.mol2_0.gninatypes 
-  8.259637310505756  1UDT_VIA/1UDT_0.gninatypes 1UDT_VIA/1UDT-results_14390.mol2_0.gninatypes 
   7.978810700930062  1UDT_VIA/1UDT_0.gninatypes 1UDT_VIA/1UDT-results_50287550.mol2_0.gninatypes 
   9.1518108830086  3B2R_VDN/3B2R_0.gninatypes 3B2R_VDN/3B2R-results_14776.mol2_0.gninatypes 
   8.886056647693163  3B2R_VDN/3B2R_0.gninatypes 3B2R_VDN/3B2R-results_50111902.mol2_0.gninatypes 

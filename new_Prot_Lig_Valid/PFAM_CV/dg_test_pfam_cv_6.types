@@ -1,15 +1,3 @@
-  10.522878745280337  1N46_PFA/1N46_0.gninatypes 1N46_PFA/1N46-results_50123046.mol2_0.gninatypes 
-  9.292429823902063  1N46_PFA/1N46_0.gninatypes 1N46_PFA/1N46-results_50304780.mol2_0.gninatypes 
-  7.055517327849832  2I4J_DRJ/2I4J_0.gninatypes 2I4J_DRJ/2I4J-results_28762.mol2_0.gninatypes 
-  6.012780770091995  2I4J_DRJ/2I4J_0.gninatypes 2I4J_DRJ/2I4J-results_28763.mol2_0.gninatypes 
-  7.055517327849832  2I4Z_DRH/2I4Z_0.gninatypes 2I4Z_DRH/2I4Z-results_28762.mol2_0.gninatypes 
-  6.012780770091995  2I4Z_DRH/2I4Z_0.gninatypes 2I4Z_DRH/2I4Z-results_28763.mol2_0.gninatypes 
-  7.055517327849832  2I4P_DRH/2I4P_0.gninatypes 2I4P_DRH/2I4P-results_28762.mol2_0.gninatypes 
-  6.012780770091995  2I4P_DRH/2I4P_0.gninatypes 2I4P_DRH/2I4P-results_28763.mol2_0.gninatypes 
-  9.075720713938118  3JZC_4HY/3JZC_0.gninatypes 3JZC_4HY/3JZC-results_50274809.mol2_0.gninatypes 
-  6.567030709125595  3JZC_4HY/3JZC_0.gninatypes 3JZC_4HY/3JZC-results_50275225.mol2_0.gninatypes 
-  8.154901959985743  3IMY_B72/3IMY_0.gninatypes 3IMY_B72/3IMY-results_50275257.mol2_0.gninatypes 
-  7.060480747381382  3IMY_B72/3IMY_0.gninatypes 3IMY_B72/3IMY-results_50275259.mol2_0.gninatypes 
   7.6777807052660805  1NAX_IH5/1NAX_0.gninatypes 1NAX_IH5/1NAX-results_18868.mol2_0.gninatypes 
   9.0  1NAX_IH5/1NAX_0.gninatypes 1NAX_IH5/1NAX-results_18869.mol2_0.gninatypes 
   9.823908740944319  1NAX_IH5/1NAX_0.gninatypes 1NAX_IH5/1NAX-results_18870.mol2_0.gninatypes 
@@ -112,20 +100,22 @@
   7.1220530483708115  1NAX_IH5/1NAX_0.gninatypes 1NAX_IH5/1NAX-results_18930.mol2_0.gninatypes 
   6.9083330424043154  1NAX_IH5/1NAX_0.gninatypes 1NAX_IH5/1NAX-results_18934.mol2_0.gninatypes 
   7.170696227168975  1NAX_IH5/1NAX_0.gninatypes 1NAX_IH5/1NAX-results_18935.mol2_0.gninatypes 
-  6.221848749616356  2GPV_OHT/2GPV_0.gninatypes 2GPV_OHT/2GPV-results_20608.mol2_0.gninatypes 
-  7.024568191490737  2GPV_OHT/2GPV_0.gninatypes 2GPV_OHT/2GPV-results_22435.mol2_0.gninatypes 
   10.346787486224656  1BSX_T3/1BSX_0.gninatypes 1BSX_T3/1BSX-results_18862.mol2_0.gninatypes 
-  6.221848749616356  2P7Z_OHT/2P7Z_0.gninatypes 2P7Z_OHT/2P7Z-results_20608.mol2_0.gninatypes 
-  7.024568191490737  2P7Z_OHT/2P7Z_0.gninatypes 2P7Z_OHT/2P7Z-results_22435.mol2_0.gninatypes 
-  6.221848749616356  2EWP_TXF/2EWP_0.gninatypes 2EWP_TXF/2EWP-results_20608.mol2_0.gninatypes 
-  7.024568191490737  2EWP_TXF/2EWP_0.gninatypes 2EWP_TXF/2EWP-results_22435.mol2_0.gninatypes 
-  6.221848749616356  1VJB_OHT/1VJB_0.gninatypes 1VJB_OHT/1VJB-results_20608.mol2_0.gninatypes 
-  7.024568191490737  1VJB_OHT/1VJB_0.gninatypes 1VJB_OHT/1VJB-results_22435.mol2_0.gninatypes 
-  6.221848749616356  1S9Q_OHT/1S9Q_0.gninatypes 1S9Q_OHT/1S9Q-results_20608.mol2_0.gninatypes 
-  7.024568191490737  1S9Q_OHT/1S9Q_0.gninatypes 1S9Q_OHT/1S9Q-results_22435.mol2_0.gninatypes 
   10.346787486224656  3JZC_4HY/3JZC_0.gninatypes 3JZC_4HY/3JZC-results_18862.mol2_0.gninatypes 
   8.045757490560675  2P7G_2OH/2P7G_0.gninatypes 2P7G_2OH/2P7G-results_29608.mol2_0.gninatypes 
   10.346787486224656  1XZX_T3/1XZX_0.gninatypes 1XZX_T3/1XZX-results_18862.mol2_0.gninatypes 
+  10.522878745280337  1N46_PFA/1N46_0.gninatypes 1N46_PFA/1N46-results_50123046.mol2_0.gninatypes 
+  9.292429823902063  1N46_PFA/1N46_0.gninatypes 1N46_PFA/1N46-results_50304780.mol2_0.gninatypes 
+  7.055517327849832  2I4J_DRJ/2I4J_0.gninatypes 2I4J_DRJ/2I4J-results_28762.mol2_0.gninatypes 
+  6.012780770091995  2I4J_DRJ/2I4J_0.gninatypes 2I4J_DRJ/2I4J-results_28763.mol2_0.gninatypes 
+  7.055517327849832  2I4Z_DRH/2I4Z_0.gninatypes 2I4Z_DRH/2I4Z-results_28762.mol2_0.gninatypes 
+  6.012780770091995  2I4Z_DRH/2I4Z_0.gninatypes 2I4Z_DRH/2I4Z-results_28763.mol2_0.gninatypes 
+  7.055517327849832  2I4P_DRH/2I4P_0.gninatypes 2I4P_DRH/2I4P-results_28762.mol2_0.gninatypes 
+  6.012780770091995  2I4P_DRH/2I4P_0.gninatypes 2I4P_DRH/2I4P-results_28763.mol2_0.gninatypes 
+  9.075720713938118  3JZC_4HY/3JZC_0.gninatypes 3JZC_4HY/3JZC-results_50274809.mol2_0.gninatypes 
+  6.567030709125595  3JZC_4HY/3JZC_0.gninatypes 3JZC_4HY/3JZC-results_50275225.mol2_0.gninatypes 
+  8.154901959985743  3IMY_B72/3IMY_0.gninatypes 3IMY_B72/3IMY-results_50275257.mol2_0.gninatypes 
+  7.060480747381382  3IMY_B72/3IMY_0.gninatypes 3IMY_B72/3IMY-results_50275259.mol2_0.gninatypes 
   6.164309428507575  2I4J_DRJ/2I4J_0.gninatypes 2I4J_DRJ/2I4J-results_28762.mol2_0.gninatypes 
   5.7037737127388395  2I4J_DRJ/2I4J_0.gninatypes 2I4J_DRJ/2I4J-results_28763.mol2_0.gninatypes 
   6.164309428507575  2I4Z_DRH/2I4Z_0.gninatypes 2I4Z_DRH/2I4Z-results_28762.mol2_0.gninatypes 
