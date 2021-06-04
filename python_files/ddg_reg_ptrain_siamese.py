@@ -26,7 +26,7 @@ parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
 parser.add_argument('--non_lin',choices=['relu','leakyrelu'],default='relu',help='non-linearity to use in the network')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
-parser.add_argument('--solver', default="adam", choices=('adam','sgd'), type=str, help="solver to use")
+parser.add_argument('--solver', default="adam", choices=('adam','sgd','lars'), type=str, help="solver to use")
 parser.add_argument('--epoch',default=200,type=int,help='number of epochs to train for (default %(default)d)')
 parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb run')
 parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use batch normalization during the training process')
@@ -72,6 +72,43 @@ def weights_init(m):
         init.xavier_uniform_(m.weight.data)
         if m.bias is not None:
             init.constant_(m.bias.data, 0)
+
+class LARS(torch.optim.Optimizer):
+    def __init__(self, params, lr, weight_decay=0, momentum=0.9, eta=0.001,
+                 weight_decay_filter=None, lars_adaptation_filter=None):
+        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum,
+                        eta=eta, weight_decay_filter=weight_decay_filter,
+                        lars_adaptation_filter=lars_adaptation_filter)
+        super().__init__(params, defaults)
+
+    @torch.no_grad()
+    def step(self):
+        for g in self.param_groups:
+            for p in g['params']:
+                dp = p.grad
+
+                if dp is None:
+                    continue
+
+                if g['weight_decay_filter'] is None or not g['weight_decay_filter'](p):
+                    dp = dp.add(p, alpha=g['weight_decay'])
+
+                if g['lars_adaptation_filter'] is None or not g['lars_adaptation_filter'](p):
+                    param_norm = torch.norm(p)
+                    update_norm = torch.norm(dp)
+                    one = torch.ones_like(param_norm)
+                    q = torch.where(param_norm > 0.,
+                                    torch.where(update_norm > 0,
+                                                (g['eta'] * param_norm / update_norm), one), one)
+                    dp = dp.mul(q)
+
+                param_state = self.state[p]
+                if 'mu' not in param_state:
+                    param_state['mu'] = torch.zeros_like(p)
+                mu = param_state['mu']
+                mu.mul_(g['momentum']).add_(dp)
+
+                p.add_(mu, alpha=-g['lr'])
 
 class CrossCorrLoss(nn.Module):    
     def __init__(self, rep_size, lambd, device='cpu'):    
@@ -469,12 +506,12 @@ def test(model, test_data, latent_rep,proj=None):
                 ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
                 rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
                 rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
+                zero_tensor = torch.zeros(ddg_lig1.size()).to("cuda:0")
                 rotation_loss += ddgrotloss1(ddg_lig1, zero_tensor) 
                 rotation_loss += ddgrotloss2(ddg_lig2, zero_tensor) 
             loss_lig1 = criterion_lig1(lig1, lig1_labels)
             loss_lig2 = criterion_lig2(lig2, lig2_labels)
             ddg_loss = criterion(output, labels)
-            zero_tensor = torch.zeros(ddg_lig1.size()).to("cuda:0")
             loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
@@ -615,14 +652,19 @@ elif latent_rep: ## only other option is 'covar' for the Barlow Twins approach, 
     crosscorr_lambda = 1.0/proj_size
     if args.crosscorr_lambda:
         crosscorr_lambda = args.crosscorr_lambda
+    else:
+       wandb.config.update({"crosscorr_lambda": crosscorr_lambda},allow_val_change=True) 
     dgrotloss1 = CrossCorrLoss(proj_size,crosscorr_lambda,device='cuda')
     dgrotloss2 = CrossCorrLoss(proj_size,crosscorr_lambda,device='cuda')
 params = [param for param in model.parameters()]
 if projector:
+    print("Adding projector to optimizer parameters")
     params += [param for param in projector.parameters()]
-optimizer = optim.SGD(params, lr=args.lr, weight_decay=args.weight_decay)
-if args.solver == "adam":
-    optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.weight_decay)
+optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.weight_decay)
+if args.solver == "sgd":
+    optimizer = optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+elif args.solver == 'lars':
+    optimizer = LARS(params, lr=args.lr,momentum=args.momentum,weight_decay=args.weight_decay)
 
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.7, threshold=0.001, patience=20, verbose=True)
