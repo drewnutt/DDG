@@ -18,10 +18,10 @@ mpl.use('Agg')
 parser = argparse.ArgumentParser()
 parser.add_argument('--ligtr', required=True, help='location of training ligand cache file input')
 parser.add_argument('--rectr', required=True,help='location of training receptor cache file input')
-parser.add_argument('--trainfile', required=True, help='location of training information, this must have a group indicator')
+parser.add_argument('--trainfile', required=True, help='location of training information')
 parser.add_argument('--ligte', required=True, help='location of testing ligand cache file input')
 parser.add_argument('--recte', required=True, help='location of testing receptor cache file input')
-parser.add_argument('--testfile', required=True, help='location of testing information, this must have a group indicator')
+parser.add_argument('--testfile', required=True, help='location of testing information')
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
 parser.add_argument('--non_lin',choices=['relu','leakyrelu'],default='relu',help='non-linearity to use in the network')
@@ -60,17 +60,14 @@ def weights_init(m):
 
 def train(model, traine, optimizer):
     model.train()
-    full_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
+    full_loss = 0
 
     output_dist, actual = [], []
-    lig_pred, lig_labels = [], []
     for idx, batch in enumerate(traine):
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-        batch.extract_label(1, float_labels)
+        batch.extract_label(0, float_labels)
         labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
         optimizer.zero_grad()
-        lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
-        lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
         output = model(input_tensor_1[:, :, :, :, :])
         ddg_loss = criterion(output, labels)
         loss = ddg_loss 
@@ -95,243 +92,6 @@ def train(model, traine, optimizer):
     return avg_loss, both_calc_distr, r, rmse, both_labels
 
 
-def train_ss_after(model, train_data,test_data, optimizer, latent_rep):
-    model.train()
-    full_loss, lig_loss, rot_loss, DDG_loss, ss_loss = 0, 0, 0, 0, 0
-
-    output_dist, actual = [], []
-    lig_pred, lig_labels = [], []
-    for idx, train_batch in enumerate(train_data):
-        #now do a batch of actual training with labels
-        gmaker.forward(train_batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-        gmaker.forward(train_batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        train_batch.extract_label(1, float_labels)
-        labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
-        optimizer.zero_grad()
-        train_batch.extract_label(2, lig1_label)
-        train_batch.extract_label(3, lig2_label)
-        lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
-        lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
-        if latent_rep:
-            train_output, lig1, lig2, lig1_rep, lig2_rep = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            rotation_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2)
-            rotation_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
-        else:
-            train_output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-            rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-        loss_lig1 = criterion_lig1(lig1, lig1_labels)
-        loss_lig2 = criterion_lig2(lig2, lig2_labels)
-        ddg_loss = criterion(train_output, labels)
-        rotation_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        rotation_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), train_output)
-        lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
-        lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
-        lig_loss += loss_lig1 + loss_lig2
-        rot_loss += rotation_loss
-        DDG_loss += ddg_loss
-        full_loss += loss
-        loss.backward()
-        if args.clip > 0:
-            nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-        optimizer.step()
-
-        # Now do a batch of the self-supervised training on the unlabelled test data
-        optimizer.zero_grad()
-        test_batch = test_data.next_batch()
-        gmaker.forward(test_batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-        gmaker.forward(test_batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        if latent_rep:
-            output, lig1, lig2, lig1_rep, lig2_rep = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            self_super_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2)
-            self_super_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
-        else:
-            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            self_super_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-            self_super_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-        self_super_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        self_super_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        ss_loss += self_super_loss 
-        self_super_loss.backward()
-        if args.clip > 0:
-            nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-        optimizer.step()
-
-        output_dist += train_output.flatten().tolist()
-        actual += labels.flatten().tolist()
-
-    total_samples = (idx + 1) * len(train_batch)
-    try:
-        r, _=pearsonr(np.array(actual),np.array(output_dist))
-    except ValueError as e:
-        print('{}:{}'.format(epoch,e))
-        r=np.nan
-    try:
-        rligs,_=pearsonr(np.array(lig_pred),np.array(lig_labels))
-        temp = r
-        r = (temp,rligs)
-    except ValueError as e:
-        print(f'{epoch}:{e}')
-        tmp = r
-        r = (tmp,np.nan)
-    rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-    avg_loss = full_loss/(total_samples)
-    avg_lig_loss = lig_loss / (2*total_samples)
-    avg_rot_loss = rot_loss / (total_samples)
-    avg_DDG_loss = DDG_loss / (total_samples)
-    avg_ss_loss = ss_loss / total_samples
-    tmp = avg_loss
-    avg_loss = (tmp, avg_lig_loss, avg_DDG_loss, avg_rot_loss, avg_ss_loss)
-    rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
-    tmp = rmse
-    rmse = (rmse, rmse_ligs)
-    both_calc_distr = (output_dist, lig_pred)
-    both_labels = (actual, lig_labels)
-    return avg_loss, both_calc_distr, r, rmse, both_labels
-
-def train_ss_before(model, train_data,test_data, optimizer, latent_rep):
-    model.train()
-    full_loss, lig_loss, rot_loss, DDG_loss, ss_loss = 0, 0, 0, 0, 0
-
-    output_dist, actual = [], []
-    lig_pred, lig_labels = [], []
-    for idx, train_batch in enumerate(train_data):
-        # Now do a batch of the self-supervised training on the unlabelled test data
-        optimizer.zero_grad()
-        test_batch = test_data.next_batch()
-        gmaker.forward(test_batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-        gmaker.forward(test_batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        if latent_rep:
-            output, lig1, lig2, lig1_rep, lig2_rep = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            self_super_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2)
-            self_super_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
-        else:
-            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            self_super_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-            self_super_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-        self_super_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        self_super_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        ss_loss += self_super_loss 
-        self_super_loss.backward()
-        if args.clip > 0:
-            nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-        optimizer.step()
-
-        #now do a batch of actual training with labels
-        gmaker.forward(train_batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-        gmaker.forward(train_batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        train_batch.extract_label(1, float_labels)
-        labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
-        optimizer.zero_grad()
-        train_batch.extract_label(2, lig1_label)
-        train_batch.extract_label(3, lig2_label)
-        lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
-        lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
-        if latent_rep:
-            output, lig1, lig2, lig1_rep, lig2_rep = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            rotation_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2)
-            rotation_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
-        else:
-            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-            rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-        loss_lig1 = criterion_lig1(lig1, lig1_labels)
-        loss_lig2 = criterion_lig2(lig2, lig2_labels)
-        ddg_loss = criterion(output, labels)
-        rotation_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        rotation_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda')) 
-        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
-        lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
-        lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
-        lig_loss += loss_lig1 + loss_lig2
-        rot_loss += rotation_loss
-        DDG_loss += ddg_loss
-        full_loss += loss
-        loss.backward()
-        if args.clip > 0:
-            nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-        optimizer.step()
-
-
-
-        output_dist += output.flatten().tolist()
-        actual += labels.flatten().tolist()
-
-    total_samples = (idx + 1) * len(train_batch)
-    try:
-        r, _=pearsonr(np.array(actual),np.array(output_dist))
-    except ValueError as e:
-        print('{}:{}'.format(epoch,e))
-        r=np.nan
-    try:
-        rligs,_=pearsonr(np.array(lig_pred),np.array(lig_labels))
-        temp = r
-        r = (temp,rligs)
-    except ValueError as e:
-        print(f'{epoch}:{e}')
-        tmp = r
-        r = (tmp,np.nan)
-    rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
-    avg_loss = full_loss/(total_samples)
-    avg_lig_loss = lig_loss / (2*total_samples)
-    avg_rot_loss = rot_loss / (total_samples)
-    avg_DDG_loss = DDG_loss / (total_samples)
-    avg_ss_loss = ss_loss / total_samples
-    tmp = avg_loss
-    avg_loss = (tmp, avg_lig_loss, avg_DDG_loss, avg_rot_loss, avg_ss_loss)
-    rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
-    tmp = rmse
-    rmse = (rmse, rmse_ligs)
-    both_calc_distr = (output_dist, lig_pred)
-    both_labels = (actual, lig_labels)
-    return avg_loss, both_calc_distr, r, rmse, both_labels
-
-def train_rotation(model, ss_data, optimizer, latent_rep):
-    model.train()
-    full_loss = 0
-
-    for idx, batch in enumerate(ss_data):
-        gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-        gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        optimizer.zero_grad()
-        if latent_rep:
-            ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            rotation_loss = dgrotloss1(lig1_selfrep1, lig1_selfrep2)
-            rotation_loss += dgrotloss2(lig2_selfrep1, lig2_selfrep2)
-        else:
-            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-            rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-        rotation_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda'))
-        rotation_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda'))
-        loss = args.rotation_loss_weight * rotation_loss
-        full_loss += loss
-        loss.backward()
-        optimizer.step()
-
-    total_samples = (idx + 1) * len(batch)
-    avg_loss = full_loss/(total_samples)
-    return avg_loss
-
 def test(model, test_data,test_recs_split=None):
     model.eval()
     test_loss= 0
@@ -340,10 +100,10 @@ def test(model, test_data,test_recs_split=None):
     with torch.no_grad():
         for idx, batch in enumerate(test_data):        
             gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-            batch.extract_label(1, float_labels)
+            batch.extract_label(0, float_labels)
             labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
             optimizer.zero_grad()
-            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+            output = model(input_tensor_1[:, :, :, :, :])
             ddg_loss = criterion(output, labels)
             loss = ddg_loss
             test_loss += loss
@@ -385,7 +145,7 @@ epochs = args.epoch
 
 
 
-traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, balanced=True, shuffle=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.SmallEpoch)
+traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, shuffle=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.SmallEpoch)
 traine.populate(args.trainfile)
 teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.SmallEpoch)
 teste.populate(args.testfile)
@@ -461,18 +221,18 @@ for epoch in range(1, epochs+1):
     if epoch % 10 == 0: # only log the graphs every 10 epochs, make things a bit faster
         train_absaff_fig = plt.figure(3)
         train_absaff_fig.clf()
-        plt.scatter(tr_act[0],out_dist[0])
+        plt.scatter(tr_act,out_dist)
         plt.xlabel('Actual affinity')
         plt.ylabel('Predicted affinity')
         wandb.log({"Actual vs. Predicted Affinity (Train)": train_absaff_fig})
         test_absaff_fig = plt.figure(4)
         test_absaff_fig.clf()
-        plt.scatter(tt_act[0],out_d[0])
+        plt.scatter(tt_act,out_d)
         plt.xlabel('Actual affinity')
         plt.ylabel('Predicted affinity')
         wandb.log({"Actual vs. Predicted Affinity (Test)": test_absaff_fig})
 
-    print(f'Test/Train AbsAff R:{tt_r[1]:.4f}\t{tr_r[1]:.4f}')
+    print(f'Test/Train AbsAff R:{tt_r:.4f}\t{tr_r:.4f}')
     wandb.log({
         #"Test 'Average' R": tt_rave,
         "Avg Train Loss AbsAff": tr_loss,
