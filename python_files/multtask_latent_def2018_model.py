@@ -47,13 +47,19 @@ class Net(nn.Module):
                 flattener = View((-1,last_size))
                 self.add_module('flatten',flattener)
                 self.modules.append(flattener)
-                fc = nn.Linear(last_size,config.hidden_size)
-                self.add_module('reduce_dim',fc)
-                self.modules.append(fc)
-                self.ddg = nn.Linear(config.hidden_size,1)
-                self.add_module('DDG',self.ddg)
-                self.dg = nn.Linear(config.hidden_size,1)
-                self.add_module('affinity',self.dg)
+                if config.hidden_size > 0:
+                    fc = nn.Linear(last_size,config.hidden_size)
+                    self.add_module('reduce_dim',fc)
+                    self.modules.append(fc)
+                    self.ddg = nn.Linear(config.hidden_size,1)
+                    self.add_module('DDG',self.ddg)
+                    self.dg = nn.Linear(config.hidden_size,1)
+                    self.add_module('affinity',self.dg)
+                else:
+                    self.ddg = nn.Linear(last_size,1)
+                    self.add_module('DDG',self.ddg)
+                    self.dg = nn.Linear(last_size,1)
+                    self.add_module('affinity',self.dg)
 
         def forward_one(self, x): #should approximate the affinity of the receptor/ligand pair
                 for layer in self.modules:
@@ -65,7 +71,7 @@ class Net(nn.Module):
         def forward(self,x1,x2):
                 lig1 = self.forward_one(x1)
                 lig2 = self.forward_one(x2)
-                lig1_aff = self.dg(self.func(lig1))
-                lig2_aff = self.dg(self.func(lig2))
+                lig1_aff = self.dg(lig1)
+                lig2_aff = self.dg(lig2)
                 diff = self.dropout(lig1 - lig2)
                 return self.ddg(diff), lig1_aff, lig2_aff,lig1,lig2
