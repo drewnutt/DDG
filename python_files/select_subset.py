@@ -23,7 +23,7 @@ def split_comparison(comparison,rng):
 def get_more_ligs(rec,ligs_in,test_data,n_left,rng):
     cong_series = test_data[test_data['rec'] == rec]
     ligs_left = set(cong_series['lig1'].unique().tolist() + cong_series['lig2'].unique().tolist()) - set(ligs_in)
-    ligs_left = list(ligs_left)
+    ligs_left = sorted(list(ligs_left))
     while n_left:
         if len(ligs_left) == 0:
             break
