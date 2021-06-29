@@ -681,10 +681,12 @@ num_iters_pe = int(np.ceil(traine.small_epoch_size()/args.batch_size))
 if args.iter_scheme == 'large':
     num_iters_pe = int(np.floor(traine.large_epoch_size()/args.batch_size))
 if args.rot_warmup:
+    init_iters = num_iters_pe * (10)
+    before_warmup = np.full((init_iters,),0)
     num_iters = num_iters_pe * args.rot_warmup
     warmup_schedule = np.linspace(0,args.rotation_loss_weight,int(num_iters) )
-    final_iters = num_iters_pe * (args.epoch-args.rot_warmup)
-    args.rotation_loss_weight = np.concatenate((warmup_schedule,np.full((final_iters,),args.rotation_loss_weight)))
+    final_iters = num_iters_pe * (args.epoch-args.rot_warmup-10)
+    args.rotation_loss_weight = np.concatenate((before_warmup,warmup_schedule,np.full((final_iters,),args.rotation_loss_weight)))
 else:
     all_iters = num_iters_pe * (args.epoch)
     args.rotation_loss_weight = np.full((all_iters,),args.rotation_loss_weight)
