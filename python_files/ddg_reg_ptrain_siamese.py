@@ -49,6 +49,7 @@ parser.add_argument('--latent_loss',default='mse', choices=['mse','corr'],help='
 parser.add_argument('--crosscorr_lambda', type=float, help='lambda value to use in the Cross Correlation Loss')
 parser.add_argument('--proj_size',type=int,default=4096,help='size to project the latent representation to, this is the dimension that the CrossCorrLoss will be applied to (default: %(default)d')
 parser.add_argument('--proj_layers',type=int,default=3,help='how many layers in the projection network, if 0 then there is no projection network(default: %(default)d')
+parser.add_argument('--rot_warmup','-RW',default=30,type=int,help='how many epochs to warmup from 0 to your desired weight for rotation loss')
 parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the example provider stratifying by the receptor')
 parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
 args = parser.parse_args()
@@ -156,13 +157,14 @@ class Projector(nn.Module):
         return x
         
 
-def train(model, traine, test_data, optimizer, latent_rep, proj=None):
+def train(model, traine, test_data, optimizer, latent_rep, epoch, proj=None):
     model.train()
     full_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
 
     output_dist, actual = [], []
     lig_pred, lig_labels = [], []
     for idx, batch in enumerate(traine):
+        it = num_exs/args.batch_size * epoch + idx
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
         batch.extract_label(1, float_labels)
@@ -195,7 +197,7 @@ def train(model, traine, test_data, optimizer, latent_rep, proj=None):
         loss_lig1 = criterion_lig1(lig1, lig1_labels)
         loss_lig2 = criterion_lig2(lig2, lig2_labels)
         ddg_loss = criterion(output, labels)
-        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
+        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight[it] * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
         lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
         lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
         lig_loss += loss_lig1 + loss_lig2
@@ -475,7 +477,7 @@ def train_rotation(model, ss_data, optimizer, latent_rep):
     avg_loss = full_loss/(total_samples)
     return avg_loss
 
-def test(model, test_data, latent_rep,proj=None):
+def test(model, test_data, latent_rep, epoch, proj=None):
     model.eval()
     test_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
 
@@ -483,6 +485,7 @@ def test(model, test_data, latent_rep,proj=None):
     lig_pred, lig_labels = [], []
     with torch.no_grad():
         for idx, batch in enumerate(test_data):        
+            it = num_exs/args.batch_size * epoch + idx
             gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
             gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
             batch.extract_label(1, float_labels)
@@ -516,7 +519,7 @@ def test(model, test_data, latent_rep,proj=None):
             loss_lig1 = criterion_lig1(lig1, lig1_labels)
             loss_lig2 = criterion_lig2(lig2, lig2_labels)
             ddg_loss = criterion(output, labels)
-            loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
+            loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight[it] * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
             lig_loss += loss_lig1 + loss_lig2
@@ -672,6 +675,20 @@ if args.solver == "sgd":
 elif args.solver == 'lars':
     optimizer = LARS(params, lr=args.lr,momentum=args.momentum,weight_decay=args.weight_decay)
 
+num_exs = traine.small_epoch_size()
+if args.iter_scheme == 'large':
+    num_exs = traine.large_epoch_size()
+if args.rot_warmup:
+    num_iters = num_exs/args.batch_size * args.rot_warmup
+    print(num_iters)
+    warmup_schedule = np.linspace(0,args.rotation_loss_weight,int(num_iters) )
+    final_iters = num_exs/args.batch_size * (args.epoch-args.rot_warmup)
+    args.rotation_loss_weight = np.concatenate((warmup_schedule,np.full((final_iters,),args.rotation_loss_weight)))
+else:
+    all_iters = num_exs/args.batch_size * (args.epoch)
+    args.rotation_loss_weight = np.full((all_iters,),args.rotation_loss_weight)
+
+
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.7, threshold=0.001, patience=20, verbose=True)
 
@@ -686,15 +703,15 @@ wandb.watch(model, log='all')
 # max_rot_weight = args.rotation_loss_weight
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
-tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep, proj=projector)
+tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep,1,proj=projector)
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}')
 for epoch in range(1, epochs+1):
     # if args.self_supervised_test:
     #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
     # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
     # args.rotation_loss_weight = max_rot_weight * epoch/epochs
-    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train_func(model, traine, ss_test, optimizer, latent_rep,proj=projector)
-    tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep,proj=projector)
+    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train_func(model, traine, ss_test, optimizer, latent_rep, epoch, proj=projector)
+    tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep, epoch, proj=projector)
     if args.absolute_dg_loss:
         scheduler.step(tr_loss[0])
     else:
