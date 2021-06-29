@@ -49,7 +49,7 @@ parser.add_argument('--latent_loss',default='mse', choices=['mse','corr'],help='
 parser.add_argument('--crosscorr_lambda', type=float, help='lambda value to use in the Cross Correlation Loss')
 parser.add_argument('--proj_size',type=int,default=4096,help='size to project the latent representation to, this is the dimension that the CrossCorrLoss will be applied to (default: %(default)d')
 parser.add_argument('--proj_layers',type=int,default=3,help='how many layers in the projection network, if 0 then there is no projection network(default: %(default)d')
-parser.add_argument('--rot_warmup','-RW',default=30,type=int,help='how many epochs to warmup from 0 to your desired weight for rotation loss')
+parser.add_argument('--rot_warmup','-RW',default=0,type=int,help='how many epochs to warmup from 0 to your desired weight for rotation loss')
 parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the example provider stratifying by the receptor')
 parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
 args = parser.parse_args()
@@ -164,7 +164,7 @@ def train(model, traine, test_data, optimizer, latent_rep, epoch, proj=None):
     output_dist, actual = [], []
     lig_pred, lig_labels = [], []
     for idx, batch in enumerate(traine):
-        it = num_exs/args.batch_size * epoch + idx
+        it = num_iters_pe * epoch + idx
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
         batch.extract_label(1, float_labels)
@@ -210,6 +210,8 @@ def train(model, traine, test_data, optimizer, latent_rep, epoch, proj=None):
         optimizer.step()
         output_dist += output.flatten().tolist()
         actual += labels.flatten().tolist()
+
+    print(f'{epoch}: {args.rotation_loss_weight[it]}')
 
     total_samples = (idx + 1) * len(batch)
     try:
@@ -485,7 +487,7 @@ def test(model, test_data, latent_rep, epoch, proj=None):
     lig_pred, lig_labels = [], []
     with torch.no_grad():
         for idx, batch in enumerate(test_data):        
-            it = num_exs/args.batch_size * epoch + idx
+            it = num_iters_pe * epoch + idx
             gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
             gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
             batch.extract_label(1, float_labels)
@@ -675,17 +677,16 @@ if args.solver == "sgd":
 elif args.solver == 'lars':
     optimizer = LARS(params, lr=args.lr,momentum=args.momentum,weight_decay=args.weight_decay)
 
-num_exs = traine.small_epoch_size()
+num_iters_pe = int(np.ceil(traine.small_epoch_size()/args.batch_size))
 if args.iter_scheme == 'large':
-    num_exs = traine.large_epoch_size()
+    num_iters_pe = int(np.floor(traine.large_epoch_size()/args.batch_size))
 if args.rot_warmup:
-    num_iters = num_exs/args.batch_size * args.rot_warmup
-    print(num_iters)
+    num_iters = num_iters_pe * args.rot_warmup
     warmup_schedule = np.linspace(0,args.rotation_loss_weight,int(num_iters) )
-    final_iters = num_exs/args.batch_size * (args.epoch-args.rot_warmup)
+    final_iters = num_iters_pe * (args.epoch-args.rot_warmup)
     args.rotation_loss_weight = np.concatenate((warmup_schedule,np.full((final_iters,),args.rotation_loss_weight)))
 else:
-    all_iters = num_exs/args.batch_size * (args.epoch)
+    all_iters = num_iters_pe * (args.epoch)
     args.rotation_loss_weight = np.full((all_iters,),args.rotation_loss_weight)
 
 
