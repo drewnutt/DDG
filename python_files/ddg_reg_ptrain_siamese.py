@@ -33,13 +33,13 @@ parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use ba
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
-parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018'], help='Network architecture to use')
+parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=1024,type=int,help='size of fully connected layer before subtraction in latent space')
 parser.add_argument('--batch_size',default=16,type=int,help='batch size (default: %(default)d)')
 parser.add_argument('--absolute_dg_loss', '-L',action='store_true',default=False,help='use a loss function (and model architecture) that utilizes the absolute binding affinity')
-parser.add_argument('--self_supervised_test', '-S',action='store_true',default=False,help='Use the self supervised loss on the test files (no labels used)')
+parser.add_argument('--self_supervised_test', '-ST',action='store_true',default=False,help='Use the self supervised loss on the test files (no labels used)')
 parser.add_argument('--rotation_loss_weight','-R',default=1.0,type=float,help='weight to use in adding the rotation loss to the other losses (default: %(default)d)')
 parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help='weight to use in adding the consistency term to the other losses (default: %(default)d')
 parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
@@ -49,10 +49,12 @@ parser.add_argument('--latent_loss',default='mse', choices=['mse','corr'],help='
 parser.add_argument('--crosscorr_lambda', type=float, help='lambda value to use in the Cross Correlation Loss')
 parser.add_argument('--proj_size',type=int,default=4096,help='size to project the latent representation to, this is the dimension that the CrossCorrLoss will be applied to (default: %(default)d')
 parser.add_argument('--proj_layers',type=int,default=3,help='how many layers in the projection network, if 0 then there is no projection network(default: %(default)d')
+parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the example provider stratifying by the receptor')
+parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
 args = parser.parse_args()
 
 print(args.absolute_dg_loss, args.use_model)
-assert (args.absolute_dg_loss and args.use_model in ['multtask_def2018', 'ext_mult_def2018', 'multtask_latent_def2018']) or (not args.absolute_dg_loss and args.use_model in ['paper','def2018','extend_def2018']), 'Cannot have multitask loss with a non-multitask model'
+assert (args.absolute_dg_loss and args.use_model in ['multtask_def2018', 'ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense']) or (not args.absolute_dg_loss and args.use_model in ['paper','def2018','extend_def2018']), 'Cannot have multitask loss with a non-multitask model'
 
 if args.use_model == 'paper':
     from paper_model import Net
@@ -64,6 +66,8 @@ elif args.use_model == 'multtask_def2018':
     from multtask_def2018_model import Net
 elif args.use_model == 'multtask_latent_def2018':
     from multtask_latent_def2018_model import Net
+elif args.use_model == 'multtask_latent_dense':
+    from multtask_latent_dense_model import Dense as Net
 elif args.use_model == 'ext_mult_def2018':
     from extended_multtask_def2018_model import Net
 
@@ -171,8 +175,8 @@ def train(model, traine, test_data, optimizer, latent_rep, proj=None):
         if latent_rep:
             output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
             output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
-            # ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            # ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
+            # ddg_lig1, dg1_lig1, dg2_lig1, lig1_rep1, lig1_rep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
+            # ddg_lig2, dg1_lig2, dg2_lig2, lig2_rep1, lig2_rep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
             if proj:
                 lig1_rep1 = proj(lig1_rep1)
                 lig1_rep2 = proj(lig1_rep2)
@@ -566,7 +570,7 @@ def make_tags(args):
 tgs = make_tags(args) + args.tags
 wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
 
-if args.use_model == 'multtask_latent_def2018':
+if args.use_model == 'multtask_latent_def2018' or args.use_model == 'multtask_latent_dense':
     latent_rep = True
 else:
     latent_rep = False
@@ -576,11 +580,12 @@ epochs = args.epoch
 
 # print('ligtr={}, rectr={}'.format(args.ligtr,args.rectr))
 
-
-
-traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, balanced=True, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.SmallEpoch)
+iter_scheme = molgrid.IterationScheme.SmallEpoch
+if args.iter_scheme == 'large':
+    iter_scheme = molgrid.IterationScheme.LargeEpoch
+traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
 traine.populate(args.trainfile)
-teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.SmallEpoch)
+teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
 teste.populate(args.testfile)
 ss_test = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
 ss_test.populate(args.testfile)
@@ -627,6 +632,7 @@ if args.freeze_arms:
             param.requires_grad = False
     
 criterion = nn.MSELoss()
+# criterion = nn.L1Loss()
 criterion_lig1 = nn.MSELoss()
 criterion_lig2 = nn.MSELoss()
 # Not sure if these are replaceable with the Barlow Twins loss
@@ -677,6 +683,7 @@ lig2_label = torch.zeros(batch_size, dtype=torch.float32)
 
 
 wandb.watch(model, log='all')
+# max_rot_weight = args.rotation_loss_weight
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
 tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep, proj=projector)
@@ -685,6 +692,7 @@ for epoch in range(1, epochs+1):
     # if args.self_supervised_test:
     #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
     # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
+    # args.rotation_loss_weight = max_rot_weight * epoch/epochs
     tr_loss, out_dist, tr_r, tr_rmse, tr_act = train_func(model, traine, ss_test, optimizer, latent_rep,proj=projector)
     tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep,proj=projector)
     if args.absolute_dg_loss:
