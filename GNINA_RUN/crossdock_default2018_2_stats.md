@@ -1,6 +1,8 @@
-# crossdock_default2018_2:
-Metric | Accuracy
------|-----
-GNINA Affinity | 0.5720
-GNINA Score | 0.5251
-Vina Affinity | 0.5515
+# crossdock_default2018_2
+ -----
+## new_Prot_Lig_Valid/all_newdata.types:
+Metric | R | RMSE
+-----|-----|-----
+GNINA Affinity | 0.2547 | 1.19 
+GNINA Score | 0.0475 | 1.23
+Vina Affinity | 0.0771 | 2.0266

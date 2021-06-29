@@ -32,7 +32,7 @@ def makeGninaDDGFile():
         for line in f:
             logfiles.append(line.split(' ')[-1].strip())
 
-    base_dir='/net/dali/home/mscbio/anm329/deltadeltaG/'
+    base_dir='/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/logfiles/'
     for logfile in logfiles:
         with open(base_dir+logfile) as f:
             for line in f:
@@ -42,7 +42,7 @@ def makeGninaDDGFile():
                     score = float(re.findall(r'[\d.]+',line)[0])
                 elif 'CNNaffinity' in line:
                     caff = float(re.findall(r'[\d.]+',line)[0])
-        name = logfile.replace(f'{args.model}','&').split('&')[1].split('.')[0].strip('_')
+        name = logfile.replace(f'{args.model}.','&').split('&')[-1].split('.')[0]
         ligand_list.append([name,caff,score,aff])
     gnina_out_df = pd.DataFrame(ligand_list,columns=['name','cnn_aff','cnn_score','vina_aff'])
 
@@ -66,6 +66,7 @@ def makeGninaDDGFile():
                 print(rec,lig1,lig2, e)
     output_gnina_ddg = pd.DataFrame(list_of_data)
     output_gnina_ddg.columns = ['DDG_CNNaff', 'DDG_scr','DDG_Paff','rec', 'lig1', 'lig2']
+    output_gnina_ddg = output_gnina_ddg[~output_gnina_ddg.duplicated(subset=['lig1','lig2'])] #drop all of the duplicates
 
     gnina_ddg = '/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/gnina_DDG_{}.txt'.format(args.model)
     output_gnina_ddg.to_csv(gnina_ddg, sep=' ', index=False)
@@ -73,7 +74,8 @@ def makeGninaDDGFile():
     return output_gnina_ddg
 
 def getDDGstats(compare_ddg_df,ground_truth_files):
-    ligname_pattern = re.compile(r'(?:\/)([A-Z\d]{4}[\d]{2})(?:_.\.gninatypes)')
+    # ligname_pattern = re.compile(r'(?:\/)([A-Z\d]{4}[\d]{2})(?:_.\.gninatypes)')
+    ligname_pattern = re.compile(r'(?:\/)([A-Z\d]{4}-results_\d+)(?:_0.gninatypes)')
     comp_dict = dict()
     for trainfile in ground_truth_files:
         file_data = pd.read_csv(trainfile, sep=' ', header=None)
@@ -84,8 +86,10 @@ def getDDGstats(compare_ddg_df,ground_truth_files):
         train_data['lig1_lig2'] = train_data['lig1'] + train_data['lig2']
         sorted_train = train_data.sort_values(by=['lig1_lig2'])
         subset_gnina_ddg = compare_ddg_df[compare_ddg_df['lig1_lig2'].isin(train_data['lig1_lig2'])]
+        dup_these = subset_gnina_ddg[subset_gnina_ddg['lig1_lig2'].isin(sorted_train[sorted_train.duplicated(subset=['lig1_lig2'])]['lig1_lig2'])]
+        subset_gnina_ddg = pd.concat([subset_gnina_ddg,dup_these],ignore_index=True).sort_values(by=['lig1_lig2']) ## This will break if a Lig pair occurs in more than 2 measurement types
 
-        assert subset_gnina_ddg.shape[0] == train_data.shape[0]
+        assert subset_gnina_ddg.shape[0] == train_data.shape[0], f"GninaDDG:{subset_gnina_ddg.shape[0]}, test_file:{train_data.shape[0]}"
         for col in subset_gnina_ddg.columns:
             if 'DDG' not in col:
                 continue
@@ -99,7 +103,7 @@ def getDDGstats(compare_ddg_df,ground_truth_files):
         output_string += f'\n## {tfile}:\n'
         output_string += 'Metric | R | RMSE\n-----|-----|-----\nGNINA Affinity | {:.4f} | {:.2f} \nGNINA Score | {:.4f} | {:.2f}'.format(comp_dict[f'{tfile.split("/")[-1]}_DDG_CNNaff_r'], comp_dict[f'{tfile.split("/")[-1]}_DDG_CNNaff_rmse'], comp_dict[f'{tfile.split("/")[-1]}_DDG_scr_r'], comp_dict[f'{tfile.split("/")[-1]}_DDG_scr_rmse'])
         output_string += '\nVina Affinity | {:.4f} | {:.4f}'.format(comp_dict[f'{tfile.split("/")[-1]}_DDG_Paff_r'], comp_dict[f'{tfile.split("/")[-1]}_DDG_Paff_rmse'])
-    model_stat = f'/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/{args.model}_stats.md'
+    model_stat = f'/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/{args.model}_{ground_truth_files[0]}_stats.md'
     with open(model_stat,'w') as f:
         f.write(output_string)
 
@@ -109,7 +113,7 @@ if not args.pre_compiled:
 else:
     print(f"Reading in Gnina DDG file (/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/gnina_DDG_{args.model}.txt)")
     gnina_ddg_df = pd.read_csv(f'/net/dali/home/mscbio/anm329/deltadeltaG/GNINA_RUN/gnina_DDG_{args.model}.txt', sep=' ')
-gnina_ddg_df['lig1_lig2'] = gnina_ddg_df['lig1'].apply(lambda x:re.findall('[A-Z\d]{4}\d{2}',x)[0]) + gnina_ddg_df['lig2'].apply(lambda x:re.findall('[A-Z\d]{4}\d{2}',x)[0])
+gnina_ddg_df['lig1_lig2'] = gnina_ddg_df['lig1'].apply(lambda x:re.findall(r'([A-Z\d]{4}-results_\d+)',x)[0]) + gnina_ddg_df['lig2'].apply(lambda x:re.findall('([A-Z\d]{4}-results_\d+)',x)[0])
 gnina_ddg_df = gnina_ddg_df.sort_values(by=['lig1_lig2'])
 if len(args.trainf) > 0:
     print(f"Creating DDG stats for Gnina\nUsing these files for ground truth:\n\t{','.join(args.trainf)}\n")

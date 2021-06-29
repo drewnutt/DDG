@@ -1,6 +1,8 @@
-# dense_1:
-Metric | Accuracy
------|-----
-GNINA Affinity | 0.5508
-GNINA Score | 0.5175
-Vina Affinity | 0.5515
+# dense_1
+ -----
+## new_Prot_Lig_Valid/all_newdata.types:
+Metric | R | RMSE
+-----|-----|-----
+GNINA Affinity | 0.2038 | 1.27 
+GNINA Score | 0.0145 | 1.25
+Vina Affinity | 0.0771 | 2.0266

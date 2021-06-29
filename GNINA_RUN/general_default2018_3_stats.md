@@ -1,6 +1,8 @@
-# general_default2018_3:
-Metric | Accuracy
------|-----
-GNINA Affinity | 0.5882
-GNINA Score | 0.5354
-Vina Affinity | 0.5515
+# general_default2018_3
+ -----
+## new_Prot_Lig_Valid/all_newdata.types:
+Metric | R | RMSE
+-----|-----|-----
+GNINA Affinity | 0.2977 | 1.20 
+GNINA Score | 0.0715 | 1.22
+Vina Affinity | 0.0771 | 2.0266
