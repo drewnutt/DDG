@@ -33,7 +33,7 @@ parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use ba
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
-parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense'], help='Network architecture to use')
+parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'latent_paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=1024,type=int,help='size of fully connected layer before subtraction in latent space')
@@ -50,15 +50,14 @@ parser.add_argument('--train_type',default='no_SS', choices=['no_SS','SS_simult_
 parser.add_argument('--proj_size',type=int,default=4096,help='size to project the latent representation to, this is the dimension that the CrossCorrLoss will be applied to (default: %(default)d')
 parser.add_argument('--proj_layers',type=int,default=3,help='how many layers in the projection network, if 0 then there is no projection network(default: %(default)d')
 parser.add_argument('--rot_warmup','-RW',default=0,type=int,help='how many epochs to warmup from 0 to your desired weight for rotation loss')
-parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the example provider stratifying by the receptor')
+parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the training example provider stratifying by the receptor')
 parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
 args = parser.parse_args()
 
-print(args.absolute_dg_loss, args.use_model)
-assert (args.absolute_dg_loss and args.use_model in ['multtask_def2018', 'ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense']) or (not args.absolute_dg_loss and args.use_model in ['paper','def2018','extend_def2018']), 'Cannot have multitask loss with a non-multitask model'
-
 if args.use_model == 'paper':
     from paper_model import Net
+elif args.use_model == 'latent_paper':
+    from paper_latent_model import Net
 elif args.use_model == 'def2018':
     from default2018_model import Net
 elif args.use_model == 'extend_def2018':
@@ -157,7 +156,7 @@ class Projector(nn.Module):
         return x
         
 
-def train(model, traine, test_data, optimizer, latent_rep, epoch, proj=None):
+def train(model, traine, optimizer, latent_rep, epoch, proj=None):
     model.train()
     full_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
 
@@ -187,13 +186,15 @@ def train(model, traine, test_data, optimizer, latent_rep, epoch, proj=None):
             rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
             rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
         else:
-            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
             ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
             rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
+            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
             rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
             rotation_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
             rotation_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
+            del ddg_lig1, dg1_lig1, dg2_lig1, ddg_lig2, dg1_lig2, dg2_lig2 
+            torch.cuda.empty_cache()
+            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
         loss_lig1 = criterion_lig1(lig1, lig1_labels)
         loss_lig2 = criterion_lig2(lig2, lig2_labels)
         ddg_loss = criterion(output, labels)
@@ -274,8 +275,8 @@ def test(model, test_data, latent_rep, epoch, proj=None):
             else:
                 output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
                 ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-                ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
                 rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
+                ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
                 rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
                 zero_tensor = torch.zeros(ddg_lig1.size()).to("cuda:0")
                 rotation_loss += ddgrotloss1(ddg_lig1, zero_tensor) 
@@ -337,7 +338,7 @@ def make_tags(args):
 tgs = make_tags(args) + args.tags
 wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
 
-if args.use_model == 'multtask_latent_def2018' or args.use_model == 'multtask_latent_dense':
+if "latent" in args.use_model:
     latent_rep = True
 else:
     latent_rep = False
@@ -354,8 +355,6 @@ traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr,
 traine.populate(args.trainfile)
 teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
 teste.populate(args.testfile)
-ss_test = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
-ss_test.populate(args.testfile)
 
 gmaker = molgrid.GridMaker(binary=args.binary_rep)
 dims = gmaker.grid_dimensions(14*4)  # only one rec+onelig per example
@@ -438,7 +437,7 @@ if args.rot_warmup:
     final_iters = num_iters_pe * (args.epoch)
     args.rotation_loss_weight = np.concatenate((before_warmup,warmup_schedule,np.full((final_iters,),args.rotation_loss_weight)))
 else:
-    all_iters = num_iters_pe * (args.epoch)
+    all_iters = num_iters_pe * (args.epoch) * 2
     args.rotation_loss_weight = np.full((all_iters,),args.rotation_loss_weight)
 
 
@@ -463,12 +462,10 @@ for epoch in range(1, epochs+1):
     #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
     # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
     # args.rotation_loss_weight = max_rot_weight * epoch/epochs
-    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, ss_test, optimizer, latent_rep, epoch, proj=projector)
+    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep, epoch, proj=projector)
     tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep, epoch, proj=projector)
-    if args.absolute_dg_loss:
-        scheduler.step(tr_loss[0])
-    else:
-        scheduler.step(tr_loss)
+
+    scheduler.step(tr_loss[0])
     
     if not np.isnan(np.min(out_dist[0])):
         wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist[0]))}, commit=False)
