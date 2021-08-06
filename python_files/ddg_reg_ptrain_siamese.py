@@ -26,11 +26,12 @@ parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
 parser.add_argument('--non_lin',choices=['relu','leakyrelu'],default='relu',help='non-linearity to use in the network')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
-parser.add_argument('--solver', default="adam", choices=('adam','sgd','lars'), type=str, help="solver to use")
+parser.add_argument('--solver', default="adam", choices=('adam','sgd','lars','sam'), type=str, help="solver to use")
 parser.add_argument('--epoch',default=200,type=int,help='number of epochs to train for (default %(default)d)')
 parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb run')
 parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use batch normalization during the training process')
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
+parser.add_argument('--rho',default=0.05,type=float,help='rho to use with the Sharpness Aware Minimization (SAM) optimizer, size of the neighborhood')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
 parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense'], help='Network architecture to use')
@@ -426,6 +427,10 @@ if args.solver == "sgd":
     optimizer = optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 elif args.solver == 'lars':
     optimizer = LARS(params, lr=args.lr,momentum=args.momentum,weight_decay=args.weight_decay)
+elif args.solver == 'sam':
+    assert (projector is None), "SAM does not work with more than one model parameters"
+    from sam import SAMSGD
+    optimizer = SAMSGD(model.parameters(), lr=args.lr,rho=args.rho)
 
 num_iters_pe = int(np.ceil(traine.small_epoch_size()/args.batch_size))
 if args.iter_scheme == 'large':
