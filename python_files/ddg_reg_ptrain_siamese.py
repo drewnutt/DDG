@@ -35,7 +35,7 @@ parser.add_argument('--rho',default=0.05,type=float,help='rho to use with the Sh
 parser.add_argument('--adaptive_SAM',default=False,action='store_true',help='use Adaptive Sharpness Aware Minimization')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
-parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'latent_paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense'], help='Network architecture to use')
+parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'latent_paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense','multtask_latent_def2018_concat', 'multtask_latent_dense_concat'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=1024,type=int,help='size of fully connected layer before subtraction in latent space')
@@ -68,6 +68,10 @@ elif args.use_model == 'multtask_def2018':
     from multtask_def2018_model import Net
 elif args.use_model == 'multtask_latent_def2018':
     from multtask_latent_def2018_model import Net
+elif args.use_model == 'multtask_latent_def2018_concat':
+    from multtask_latent_def2018_concat_model import Net
+elif args.use_model == 'multtask_latent_dense_concat':
+    from multtask_latent_dense_concat_model import Dense as Net
 elif args.use_model == 'multtask_latent_dense':
     from multtask_latent_dense_model import Dense as Net
 elif args.use_model == 'ext_mult_def2018':
