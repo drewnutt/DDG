@@ -35,7 +35,7 @@ parser.add_argument('--rho',default=0.05,type=float,help='rho to use with the Sh
 parser.add_argument('--adaptive_SAM',default=False,action='store_true',help='use Adaptive Sharpness Aware Minimization')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
-parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'latent_paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense','multtask_latent_def2018_concat', 'multtask_latent_dense_concat'], help='Network architecture to use')
+parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'latent_paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense','multtask_latent_def2018_concat', 'multtask_latent_dense_concat','multtask_latent_equiv_def2018','multtask_latent_equiv2_def2018'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=1024,type=int,help='size of fully connected layer before subtraction in latent space')
@@ -54,6 +54,8 @@ parser.add_argument('--proj_layers',type=int,default=3,help='how many layers in 
 parser.add_argument('--rot_warmup','-RW',default=0,type=int,help='how many epochs to warmup from 0 to your desired weight for rotation loss')
 parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the training example provider stratifying by the receptor')
 parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
+parser.add_argument('--print_out','-P',default=False,action='store_true',help='print the labels and predictions during training')
+parser.add_argument('--no_rot_train',default=True,action='store_false',help='do not use random rotations during training')
 args = parser.parse_args()
 
 if args.use_model == 'paper':
@@ -76,6 +78,10 @@ elif args.use_model == 'multtask_latent_dense':
     from multtask_latent_dense_model import Dense as Net
 elif args.use_model == 'ext_mult_def2018':
     from extended_multtask_def2018_model import Net
+elif args.use_model == 'multtask_latent_equiv_def2018':
+    from multtask_latent_equiv_def2018_model import Net
+elif args.use_model == 'multtask_latent_equiv2_def2018':
+    from multtask_latent_equiv2_def2018_model import Net
 
 def weights_init(m):
     if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
@@ -170,7 +176,7 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
     lig_pred, lig_labels = [], []
     for idx, batch in enumerate(traine):
         it = num_iters_pe * epoch + idx
-        gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
+        gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=args.no_rot_train) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
         batch.extract_label(1, float_labels)
         labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
@@ -217,6 +223,10 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
         optimizer.step()
         output_dist += output.flatten().tolist()
         actual += labels.flatten().tolist()
+        if args.print_out:
+            print(f'Train:{epoch}')
+            for example in range(len(labels)):
+                print(f"{labels[example].item():.3f} {output[example].item():.3f} {lig1_labels[example].item():.3f} {lig1[example].item():.3f} {lig2_labels[example].item():.3f} {lig2[example].item():.3f}")
 
     print(f'{epoch}: {args.rotation_loss_weight[it]}')
 
@@ -244,9 +254,10 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
     rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
     tmp = rmse
     rmse = (rmse, rmse_ligs)
+    mae = (np.abs(np.array(output_dist)-np.array(actual)).mean(), np.abs(np.array(lig_pred)-np.array(lig_labels)).mean())
     both_calc_distr = (output_dist,lig_pred)
     both_labels = (actual,lig_labels)
-    return avg_loss, both_calc_distr, r, rmse, both_labels
+    return avg_loss, both_calc_distr, r, rmse, mae, both_labels
 
 def test(model, test_data, latent_rep, epoch, proj=None):
     model.eval()
@@ -299,6 +310,10 @@ def test(model, test_data, latent_rep, epoch, proj=None):
             test_loss += loss
             output_dist += output.flatten().tolist()
             actual += labels.flatten().tolist()
+            if args.print_out:
+                print(f'Test:{epoch}')
+                for example in range(len(labels)):
+                    print(f"{labels[example].item():.3f} {output[example].item():.3f} {lig1_labels[example].item():.3f} {lig1[example].item():.3f} {lig2_labels[example].item():.3f} {lig2[example].item():.3f}")
 
     total_samples = (idx + 1) * len(batch) 
 
@@ -325,9 +340,10 @@ def test(model, test_data, latent_rep, epoch, proj=None):
     rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
     tmp = rmse
     rmse = (rmse, rmse_ligs)
+    mae = (np.abs(np.array(output_dist)-np.array(actual)).mean(), np.abs(np.array(lig_pred)-np.array(lig_labels)).mean())
     both_calc_distr = (output_dist, lig_pred)
     both_labels = (actual, lig_labels)
-    return avg_loss, both_calc_distr, r, rmse, both_labels
+    return avg_loss, both_calc_distr, r, rmse, mae, both_labels
 
 
 # Make helper function to make meaningful tags
@@ -468,15 +484,15 @@ wandb.watch(model, log='all')
 # max_rot_weight = args.rotation_loss_weight
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
-tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep,1,proj=projector)
-print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}')
+tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep,1,proj=projector)
+print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}\n\tTest MAE:{tt_mae}')
 for epoch in range(1, epochs+1):
     # if args.self_supervised_test:
     #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
     # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
     # args.rotation_loss_weight = max_rot_weight * epoch/epochs
-    tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep, epoch, proj=projector)
-    tt_loss, out_d, tt_r, tt_rmse, tt_act = test(model, teste, latent_rep, epoch, proj=projector)
+    tr_loss, out_dist, tr_r, tr_rmse, tr_mae, tr_act = train(model, traine, optimizer, latent_rep, epoch, proj=projector)
+    tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep, epoch, proj=projector)
 
     scheduler.step(tr_loss[0])
     
@@ -518,6 +534,8 @@ for epoch in range(1, epochs+1):
        "Test R": tt_r[0],
        "Train RMSE": tr_rmse[0],
        "Test RMSE": tt_rmse[0],
+       "Train MAE": tr_mae[0],
+       "Test MAE": tt_mae[0],
        "Avg Train Loss AbsAff": tr_loss[1],
        "Avg Test Loss AbsAff": tt_loss[1],
        "Avg Train Loss DDG": tr_loss[2],
@@ -528,7 +546,9 @@ for epoch in range(1, epochs+1):
        "Train R AbsAff": float(tr_r[1]),
        "Test R AbsAff": float(tt_r[1]),
        "Train RMSE AbsAff": tr_rmse[1],
-       "Test RMSE AbsAff": tt_rmse[1]})
+       "Test RMSE AbsAff": tt_rmse[1],
+       "Train MAE AbsAff": tr_mae[1],
+       "Test MAE AbsAff": tt_mae[1]})
     if not epoch % 50:
             torch.save(model.state_dict(), "model.h5")
             wandb.save('model.h5')
