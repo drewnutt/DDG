@@ -1,10 +1,2 @@
-1 0.4207 7.3325 6.9119 4STD_BFS/4STD_0.gninatypes 4STD_BFS/4STD-results_50078284_0.gninatypes 4STD_BFS/4STD-results_50084016_0.gninatypes
-1 0.4063 7.3325 6.9263 4STD_BFS/4STD_0.gninatypes 4STD_BFS/4STD-results_50078284_0.gninatypes 4STD_BFS/4STD-results_50282105_0.gninatypes
-0 -0.4207 6.9119 7.3325 4STD_BFS/4STD_0.gninatypes 4STD_BFS/4STD-results_50084016_0.gninatypes 4STD_BFS/4STD-results_50078284_0.gninatypes
-0 -0.0144 6.9119 6.9263 4STD_BFS/4STD_0.gninatypes 4STD_BFS/4STD-results_50084016_0.gninatypes 4STD_BFS/4STD-results_50282105_0.gninatypes
-0 -0.4063 6.9263 7.3325 4STD_BFS/4STD_0.gninatypes 4STD_BFS/4STD-results_50282105_0.gninatypes 4STD_BFS/4STD-results_50078284_0.gninatypes
-1 0.0144 6.9263 6.9119 4STD_BFS/4STD_0.gninatypes 4STD_BFS/4STD-results_50282105_0.gninatypes 4STD_BFS/4STD-results_50084016_0.gninatypes
-1 1.4537 7.4949 6.0412 5STD_UNN/5STD_0.gninatypes 5STD_UNN/5STD-results_50078304_0.gninatypes 5STD_UNN/5STD-results_50282106_0.gninatypes
-0 -1.4537 6.0412 7.4949 5STD_UNN/5STD_0.gninatypes 5STD_UNN/5STD-results_50282106_0.gninatypes 5STD_UNN/5STD-results_50078304_0.gninatypes
-0 -2.7782 7.5229 10.3010 7STD_CRP/7STD_0.gninatypes 7STD_CRP/7STD-results_50086741_0.gninatypes 7STD_CRP/7STD-results_50080936_0.gninatypes
-1 2.7782 10.3010 7.5229 7STD_CRP/7STD_0.gninatypes 7STD_CRP/7STD-results_50080936_0.gninatypes 7STD_CRP/7STD-results_50086741_0.gninatypes
+1 0.3868 3.2565 2.8697 4FGZ_CQA/4FGZ_0.gninatypes 4FGZ_CQA/4FGZ-results_22985_0.gninatypes 4FGZ_CQA/4FGZ-results_50041457_0.gninatypes
+0 -0.3868 2.8697 3.2565 4FGZ_CQA/4FGZ_0.gninatypes 4FGZ_CQA/4FGZ-results_50041457_0.gninatypes 4FGZ_CQA/4FGZ-results_22985_0.gninatypes
