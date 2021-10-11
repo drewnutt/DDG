@@ -40,8 +40,8 @@ rng = np.random.default_rng(seed=args.random_seed)
 
 test_data = pd.read_table(args.test, sep=' ', header=None)
 test_data.columns = ['cls','ddg', 'dg1','dg2','rec','lig1','lig2']
-group_cts = test_data.value_counts(subset=['rec'])
-big_group = group_cts.index[0][0]
+group_cts = test_data['rec'].value_counts()
+big_group = group_cts.index[0]
 num_ligs = (1+np.sqrt(1+4*group_cts[0]))/2
 print(f"{big_group}: {num_ligs}")
 series = test_data[test_data['rec'] == big_group].copy()
@@ -77,5 +77,5 @@ else:
 if args.N ==6 and args.test_subset:
     leftover = series.drop(index=tt_comp.index)
     if leftover is not None:
-        leftover.to_csv(f"{args.test.split('.')[0]}_TE.types", sep=' ' , header=False,index=False)
-tt_comp.to_csv(args.train,sep=' ',header=False,index=False,mode='a') 
+        leftover.to_csv(f"{args.test.split('.')[0]}_TE.types", sep=' ' , header=False,index=False,float_format='%.4f')
+tt_comp.to_csv(args.train,sep=' ',header=False,index=False,mode='a',float_format='%.4f') 
