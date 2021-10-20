@@ -1,4 +1,4 @@
-# Models and Data for prediction of $\Delta\Delta G$
+# Models and Data for prediction of &Delta;&Delta;G
 
 Data can be found in `new_Prot_Lig_Valid/`
 

@@ -1,4 +1,4 @@
-# Data for $\Delta\Delta G$ prediction
+# Data for &Delta;&Delta;G prediction
 
 All of the data was pulled from the [BindingDB congeneric series Dataset](http://www.bindingdb.org/bind/surflex_entry.jsp).
 
