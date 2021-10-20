@@ -10,3 +10,5 @@ python_files/__pycache__/*
 
 #files
 slurm-*.out
+*.smi
+*.tar.gz
