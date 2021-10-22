@@ -378,7 +378,7 @@ iter_scheme = molgrid.IterationScheme.SmallEpoch
 if args.iter_scheme == 'large':
     iter_scheme = molgrid.IterationScheme.LargeEpoch
 if args.stratify:
-    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_pos=0, stratify_min=-.5, stratify_max=1.5, stratify_step=.5, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
+    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_pos=0, stratify_min=0, stratify_max=1, stratify_step=.5, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
 else:
     traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
 traine.populate(args.trainfile)
@@ -563,7 +563,7 @@ for epoch in range(1, epochs+1):
         torch.save(model.state_dict(), "model.h5")
         if not args.no_wandb:
             wandb.save('model.h5')
-torch.save(model.state_dict(), "model.h5")
+#torch.save(model.state_dict(), "model.h5")
 if not args.no_wandb:
     wandb.save('model.h5')
 # print("Final Train Distribution: Mean={:.4f}, Var={:.4f}".format(np.mean(out_dist),np.var(out_dist)))
