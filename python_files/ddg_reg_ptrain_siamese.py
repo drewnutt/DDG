@@ -18,6 +18,7 @@ mpl.use('Agg')
 parser = argparse.ArgumentParser()
 parser.add_argument('--ligtr', required=True, help='location of training ligand cache file input')
 parser.add_argument('--rectr', required=True,help='location of training receptor cache file input')
+parser.add_argument('--train_dataroot',default='.',help='location of additional training data')
 parser.add_argument('--trainfile', required=True, help='location of training information, this must have a group indicator')
 parser.add_argument('--ligte', required=True, help='location of testing ligand cache file input')
 parser.add_argument('--recte', required=True, help='location of testing receptor cache file input')
@@ -373,7 +374,7 @@ epochs = args.epoch
 iter_scheme = molgrid.IterationScheme.SmallEpoch
 if args.iter_scheme == 'large':
     iter_scheme = molgrid.IterationScheme.LargeEpoch
-traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
+traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
 traine.populate(args.trainfile)
 teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
 teste.populate(args.testfile)
