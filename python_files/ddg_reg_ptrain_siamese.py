@@ -57,6 +57,8 @@ parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help
 parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
 parser.add_argument('--print_out','-P',default=False,action='store_true',help='print the labels and predictions during training')
 parser.add_argument('--no_rot_train',default=True,action='store_false',help='do not use random rotations during training')
+parser.add_argument('--stratify',default=False, action='store_true', help='use the column right before the receptor for stratification')
+parser.add_argument('--no_wandb',default=False, action='store_true', help='do not log run with wandb')
 args = parser.parse_args()
 
 if args.use_model == 'paper':
@@ -359,7 +361,8 @@ def make_tags(args):
 
 
 tgs = make_tags(args) + args.tags
-wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
+if not args.no_wandb:
+    wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
 
 if "latent" in args.use_model:
     latent_rep = True
@@ -374,7 +377,10 @@ epochs = args.epoch
 iter_scheme = molgrid.IterationScheme.SmallEpoch
 if args.iter_scheme == 'large':
     iter_scheme = molgrid.IterationScheme.LargeEpoch
-traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
+if args.stratify:
+    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_pos=0, stratify_min=-.5, stratify_max=1.5, stratify_step=.5, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
+else:
+    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
 traine.populate(args.trainfile)
 teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
 teste.populate(args.testfile)
@@ -436,7 +442,8 @@ elif latent_rep: ## only other option is 'covar' for the Barlow Twins approach, 
     if args.crosscorr_lambda:
         crosscorr_lambda = args.crosscorr_lambda
     else:
-       wandb.config.update({"crosscorr_lambda": crosscorr_lambda},allow_val_change=True) 
+        if not args.no_wandb:
+           wandb.config.update({"crosscorr_lambda": crosscorr_lambda},allow_val_change=True) 
     dgrotloss1 = CrossCorrLoss(proj_size,crosscorr_lambda,device='cuda')
     dgrotloss2 = CrossCorrLoss(proj_size,crosscorr_lambda,device='cuda')
 params = [param for param in model.parameters()]
@@ -481,7 +488,8 @@ lig1_label = torch.zeros(batch_size, dtype=torch.float32)
 lig2_label = torch.zeros(batch_size, dtype=torch.float32)
 
 
-wandb.watch(model, log='all')
+if not args.no_wandb:
+    wandb.watch(model, log='all')
 # max_rot_weight = args.rotation_loss_weight
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
@@ -497,11 +505,11 @@ for epoch in range(1, epochs+1):
 
     scheduler.step(tr_loss[0])
     
-    if not np.isnan(np.min(out_dist[0])):
+    if not np.isnan(np.min(out_dist[0])) and not args.no_wandb:
         wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist[0]))}, commit=False)
-    if not np.isnan(np.min(out_d[0])):
+    if not np.isnan(np.min(out_d[0])) and not args.no_wandb:
         wandb.log({"Output Distribution Test": wandb.Histogram(np.array(out_d[0]))}, commit=False)
-    if epoch % 10 == 0: # only log the graphs every 10 epochs, make things a bit faster
+    if epoch % 10 == 0 and not args.no_wandb: # only log the graphs every 10 epochs, make things a bit faster
         fig = plt.figure(1)
         fig.clf()
         plt.scatter(tr_act[0], out_dist[0])
@@ -528,32 +536,35 @@ for epoch in range(1, epochs+1):
         wandb.log({"Actual vs. Predicted Affinity (Test)": test_absaff_fig}, commit=False)
 
     print(f'Test/Train AbsAff R:{tt_r[1]:.4f}\t{tr_r[1]:.4f}')
-    wandb.log({
-       "Avg Train Loss Total": tr_loss[0],
-       "Avg Test Loss Total": tt_loss[0],
-       "Train R": tr_r[0],
-       "Test R": tt_r[0],
-       "Train RMSE": tr_rmse[0],
-       "Test RMSE": tt_rmse[0],
-       "Train MAE": tr_mae[0],
-       "Test MAE": tt_mae[0],
-       "Avg Train Loss AbsAff": tr_loss[1],
-       "Avg Test Loss AbsAff": tt_loss[1],
-       "Avg Train Loss DDG": tr_loss[2],
-       "Avg Test Loss DDG": tt_loss[2],
-       "Avg Train Loss Rotation": tr_loss[3],
-       "Avg Self-Supervised Train Loss Rotation": tr_loss[4],
-       "Avg Test Loss Rotation": tt_loss[3],
-       "Train R AbsAff": float(tr_r[1]),
-       "Test R AbsAff": float(tt_r[1]),
-       "Train RMSE AbsAff": tr_rmse[1],
-       "Test RMSE AbsAff": tt_rmse[1],
-       "Train MAE AbsAff": tr_mae[1],
-       "Test MAE AbsAff": tt_mae[1]})
+    if not args.no_wandb:
+        wandb.log({
+           "Avg Train Loss Total": tr_loss[0],
+           "Avg Test Loss Total": tt_loss[0],
+           "Train R": tr_r[0],
+           "Test R": tt_r[0],
+           "Train RMSE": tr_rmse[0],
+           "Test RMSE": tt_rmse[0],
+           "Train MAE": tr_mae[0],
+           "Test MAE": tt_mae[0],
+           "Avg Train Loss AbsAff": tr_loss[1],
+           "Avg Test Loss AbsAff": tt_loss[1],
+           "Avg Train Loss DDG": tr_loss[2],
+           "Avg Test Loss DDG": tt_loss[2],
+           "Avg Train Loss Rotation": tr_loss[3],
+           "Avg Self-Supervised Train Loss Rotation": tr_loss[4],
+           "Avg Test Loss Rotation": tt_loss[3],
+           "Train R AbsAff": float(tr_r[1]),
+           "Test R AbsAff": float(tt_r[1]),
+           "Train RMSE AbsAff": tr_rmse[1],
+           "Test RMSE AbsAff": tt_rmse[1],
+           "Train MAE AbsAff": tr_mae[1],
+           "Test MAE AbsAff": tt_mae[1]})
     if not epoch % 50:
-            torch.save(model.state_dict(), "model.h5")
+        torch.save(model.state_dict(), "model.h5")
+        if not args.no_wandb:
             wandb.save('model.h5')
 torch.save(model.state_dict(), "model.h5")
-wandb.save('model.h5')
+if not args.no_wandb:
+    wandb.save('model.h5')
 # print("Final Train Distribution: Mean={:.4f}, Var={:.4f}".format(np.mean(out_dist),np.var(out_dist)))
 # print("Final Test Distribution: Mean={:.4f}, Var={:.4f}".format(np.mean(out_d),np.var(out_d)))

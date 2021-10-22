@@ -37,6 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('-N',required=True,type=int,help='number of test ligands to include in the train file')
     parser.add_argument('-S','--random_seed',default=42,type=int,help='random seed')
     parser.add_argument('--test_subset',action='store_true',default=False,help='keep a subset of the test data, will only work if N=6')
+    parser.add_argument('--stratify',action='store_true',default=False,help='Make a column that denotes the stratification of the two sets')
     args = parser.parse_args()
 
     failed = False
@@ -86,9 +87,17 @@ if __name__ == '__main__':
                 rec = comp['rec'].unique().item()
                 n_left -= 2
 
-    if not failed and (args.N == 6 and args.test_subset):
+    if not failed and (args.N >= 6 and args.test_subset):
         leftover = og_test_data.drop(index=tt_comp.index)
         print('did not fail')
         if len(leftover):
             leftover.to_csv(f"{args.test.split('.')[0]}_TE.types", sep=' ' , header=False,index=False,float_format='%.4f')
-    tt_comp.to_csv(args.train,sep=' ',header=False,index=False,mode='a',float_format='%.4f') 
+    if args.stratify:
+        train_data = pd.read_table(args.train, sep=' ', header=None)
+        train_data['strat'] = 1
+        train_data.to_csv(args.train,columns=['strat',1,2,3,4,5,6],sep=' ',header=False,index=False,float_format='%.4f') 
+        tt_comp = tt_comp.copy()
+        tt_comp['strat'] = 0
+        tt_comp.to_csv(args.train, columns=['strat','ddg', 'dg1','dg2','rec','lig1','lig2'], sep=' ', mode='a', header=False,index=False,float_format='%.4f') 
+    else:
+        tt_comp.to_csv(args.train, columns=['cls','ddg', 'dg1','dg2','rec','lig1','lig2'], sep=' ',header=False,index=False,mode='a',float_format='%.4f') 
