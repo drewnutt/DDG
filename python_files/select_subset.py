@@ -10,7 +10,7 @@ def split_comparison(comparison,rng):
     if rng.random() > 0.5:
         vals = ['dg2','lig2']
     comparison.at[:,vals[0]] = 0
-    comparison.at[:,vals[1]] = 'None'
+    comparison.at[:,vals[1]] = 'none'
 
     return comparison
 
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('-E','--test',required=True,help='Test types file')
     parser.add_argument('-N',required=True,type=int,help='number of test ligands to include in the train file')
     parser.add_argument('-S','--random_seed',default=42,type=int,help='random seed')
-    parser.add_argument('--test_subset',action='store_true',default=False,help='keep a subset of the test data, will only work if N=6')
+    parser.add_argument('--test_subset',action='store_true',default=False,help='keep a subset of the test data, will only work if N>=6')
     parser.add_argument('--stratify',action='store_true',default=False,help='Make a column that denotes the stratification of the two sets')
     args = parser.parse_args()
 
@@ -91,6 +91,7 @@ if __name__ == '__main__':
         leftover = og_test_data.drop(index=tt_comp.index)
         print('did not fail')
         if len(leftover):
+            print(f"{args.test.split('.')[0]}_TE.types")
             leftover.to_csv(f"{args.test.split('.')[0]}_TE.types", sep=' ' , header=False,index=False,float_format='%.4f')
     if args.stratify:
         train_data = pd.read_table(args.train, sep=' ', header=None)
