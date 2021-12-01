@@ -17,6 +17,11 @@ slurm-*.out
 *.fls
 *.log
 *.synctex.gz
+*.h5
 
 #external test sets
 external_tests/*/*_DDG_?TT.types
+
+#model files
+!models/*/*.tar.gz
+
