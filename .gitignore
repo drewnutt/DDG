@@ -12,3 +12,11 @@ python_files/__pycache__/*
 slurm-*.out
 *.smi
 *.tar.gz
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
+
+#external test sets
+external_tests/*/*_DDG_?TT.types
