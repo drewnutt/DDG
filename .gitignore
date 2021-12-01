@@ -6,6 +6,7 @@ separated_sets/**
 separated_sets/.*
 *.swp
 python_files/__pycache__/*
+.ipynb_checkpoints/
 
 
 #files
@@ -20,9 +21,9 @@ slurm-*.out
 *.h5
 
 #external test sets
-external_tests/*/*_DDG_?TT.types
+external_test/*/*DDG_?TT.types
 
 #model files
 !models/**/*.tar.gz
-models/full_train/*/*.tar
+models/full_train/**/*.tar
 
