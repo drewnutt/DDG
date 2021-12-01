@@ -23,5 +23,5 @@ slurm-*.out
 external_tests/*/*_DDG_?TT.types
 
 #model files
-!models/*/*.tar.gz
+!models/**/*.tar.gz
 
