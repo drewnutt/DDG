@@ -24,4 +24,5 @@ external_tests/*/*_DDG_?TT.types
 
 #model files
 !models/**/*.tar.gz
+models/full_train/*/*.tar
 
