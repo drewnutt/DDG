@@ -1,0 +1,339 @@
+\documentclass[tikz,border=3.14pt]{standalone}
+
+%Stack overflow for cloud rect
+\newcommand*{\StartSegmentLength}{8pt}
+\usetikzlibrary{3d,decorations.text,shapes.arrows,positioning,fit,backgrounds,shapes.geometric,calc,decorations.markings,arrows,shapes.symbols,decorations.pathmorphing}
+
+\tikzstyle{every pin edge}=[thick]
+\tikzstyle{label distance}=[0.2cm]
+\tikzset{
+    aligned pin/.style args={[#1,#2,#3,#4]#5:#6}{
+        pin={[inner sep=0pt,%
+            pin distance=#2,% new option, default = 3ex
+            very thick,
+            label={[append after command={%
+                    node[%
+                        inner sep=0pt,%
+                        xshift=#3,% modified, default = 0
+                        yshift=#4,% modified, default = 0
+                        at=(\tikzlastnode.#5),%
+                        anchor=#1,%
+                        draw opacity=0,
+                        black,
+                        font=\tiny,
+                        align=center,
+                    ]{#6}%
+                }%
+            ]center:{}}%
+        ]#5:{}}%
+    }
+}
+
+\definecolor{forestgreen}{rgb}{0,0.3,0.05}
+\definecolor{alloyorange}{rgb}{0.77,0.38,0.06}
+\definecolor{acidgreen}{rgb}{0.69,0.75,0.1}
+\definecolor{pppizzaz}{rgb}{1,0.2,1}
+\definecolor{fblue}{rgb}{0,0.47,0.7}
+\definecolor{bred}{rgb}{0.3,0,0.05}
+\definecolor{bpp}{rgb}{0.15,0,0.3}
+\definecolor{gyellow}{rgb}{0.53,1,0.3}
+\definecolor{salmon}{rgb}{1,0.58,0.5}
+\definecolor{zbrown}{rgb}{0.2,0.2,0}
+\definecolor{tblue}{rgb}{0.13,0.43,0.46}
+
+
+\begin{document}
+
+\begin{tikzpicture}        
+        % \node[anchor=west,font=\huge] (datasets) at (0,1){Datasets};
+        \begin{scope}[shift={(0,-6.0)}]
+                \node[anchor=west,text ragged,font=\large] (bdb) at ($(0,1)+(0.2,-0.5cm)$) {\underline{BindingDB Congeneric Series}};
+                \node[anchor=west,below=0cm of bdb] (bdb_cong) {1082 congeneric series};
+                \node[anchor=west,below=0cm of bdb_cong] (bdb_rec) {943 unique receptor structures};
+                \node[fit=(bdb) (bdb_rec),draw,rectangle,ultra thick,double] (bdb border) {};
+        \end{scope}
+
+        \begin{scope}[xshift=0.5cm,yshift=-6.2cm]
+                \node[anchor=north west] (mobley) at ($(2.5,0) + (-1.5,-2.1cm)$) {\underline{Mobley \textit{et al.}}};
+                \node[anchor=north west,below=0cm of mobley] (mobley_cong) {1 congeneric series};
+                \node[anchor=west,below=0.9cm of mobley] (wang) {\underline{Wang \textit{et al.}}};
+                \node[below=0cm of wang] (wang_cong) {8 congeneric series};
+                \node[below=0.9cm of wang] (Schindler) {\underline{Schindler \textit{et al.}}};
+                \node[below=0cm of Schindler] (Schindler_cong) {8 congeneric series};
+                \begin{scope}[every node/.style={rectangle,draw,very thick,double,text centered,inner sep=0.3mm,text width=1.5cm,node distance=2 cm}]
+                        \node[fit=(wang) (wang_cong)] (wang border) {};
+                        \node[fit=(mobley) (mobley_cong)] (mobley border) {};
+                        \node[fit=(Schindler) (Schindler_cong)] (Schindler border) {};
+                \end{scope}
+                % \node[cloud,draw,inner sep=-4mm,very thick,aspect=2.1,cloud puffs=30,densely dashed,minimum height=6.3cm,minimum width=5.4cm] (ext wrapper) at ($(wang border.north) + (0,-0.5cm)$) {};
+		% \node [rectangle, draw, dashed,decoration={bumps, path has corners=true, amplitude=-0.3cm, segment length=0.565cm}, minimum height=5.2cm,minimum width=4cm, decorate, line join=round,align=left, inner sep=4mm] (ext wrapper) at ($(wang border.north) + (0,-0.5cm)$) {};
+
+		%Stack Overflow for cloud rectangle
+		\node [rectangle,align=left,inner sep=4mm,minimum height=5.2cm,minimum width=4cm]  (ext wrapper) at ($(wang border.north) + (0,-0.5cm)$) {};
+
+		% Get the width \WD and height \HT of the rectangle
+		\pgfpointdiff{\pgfpointanchor{ext wrapper}{south west}}{\pgfpointanchor{ext wrapper}{north east}}
+		\pgfgetlastxy\WD\HT
+
+		% The shorter lenght of \WD and \HT is used to adapt the
+		% segment length. \L is the shorter of \WD and \HT.
+		% It is assumed that both \WD and \HT are large enough to contain
+		% quite a few bumps, thus that the recalculated segment length
+		% does not change too much. Also it is assumed, that enlarging the
+		% larger length (width or height) is visually noticed less than
+		% enlarging the smaller length.
+		\ifdim\WD<\HT
+		  \let\L\WD
+		\else
+		  \let\L\HT
+		\fi
+
+		% Recalculate the segment length.
+		% Option "segment length" seems to cover *two* bumps.
+		% Thus the calculations/roundings are done with half of the segment
+		% length.
+		\pgfmathsetlengthmacro\SegmentLength{\L / round(\L*2/\StartSegmentLength)}
+
+		% Calculate the new height and width as multiple of half of
+		% the segment length.
+		% The addition of .1pt should protect from rounding errors.
+		\pgfmathsetlengthmacro\newHT{
+		  round(\HT/\SegmentLength) * \SegmentLength + .1pt
+		}
+		\pgfmathsetlengthmacro\newWD{
+		  round(\WD/\SegmentLength) * \SegmentLength + .1pt
+		}
+
+		% Calculate the offsets for the corner points of the rectangle
+		\pgfmathsetlengthmacro\XOff{(\newWD - \WD)/2}
+		\pgfmathsetlengthmacro\YOff{(\newHT - \HT)/2}
+
+		% Full segment length
+		\pgfmathsetlengthmacro\SegmentLength{2 * \SegmentLength}
+
+		% Now the decoration:
+		\def\R{11pt}
+		\draw[
+		      decoration={bumps,amplitude=7pt, segment length=22.452pt},
+		      decorate,
+		      dotted,
+		      very thick,
+		    ]
+		      ($(ext wrapper.south west) + (\R, 0)$) arc(270:180:\R) --
+		      ($(ext wrapper.north west) + (0, -\R)$) arc(180:90:\R) --
+		      ($(ext wrapper.north east) + (-\R, 0)$) arc(90:0:\R) --
+		      ($(ext wrapper.south east) + (0, \R)$) arc(0:-90:\R) --
+		      cycle
+		    ;
+                \node[font=\large,above=-0.5cm of ext wrapper] (ext) {External Datasets:};
+        \end{scope}
+
+        %Additional Ligands Evaluation
+        \begin{scope}[every node/.style={node distance=0.5cm,font=\footnotesize},shift={(0,2)}]
+                \node[anchor=west,font=\large] (addnleval) at (0,-1){Additional Ligands Set:};
+                \node[anchor=west] (congser) at (0,-1.5){Example Congeneric Series:};  
+                \node[circle,anchor=west,draw,red,inner sep=0.2mm,right=0.1cm of congser,aligned pin={[north,1mm,0,.14cm]270:Reference\\ Ligand}] (ref) {A};
+                \foreach \letter/\place in {B/1,C/2,D/3,E/4}
+                \node[circle,draw,blue,anchor=west,inner sep=0.2mm] (ref\place) at ($(ref.west) + (\place*0.5,0)$){\letter};
+
+                \node[anchor=south west,text width=1.5cm,text centered,font=\footnotesize] (addnl) at (0,-2.6){\# of Additional};
+                \begin{scope}[every node/.style={node distance=0.9cm,anchor=west},shift={(addnl.south)}]
+                        \node[rectangle,draw,rounded corners,text centered,font=\footnotesize] (1addnl) at (0,-0.3){1};
+                        \node[rectangle,draw,rounded corners,text centered,font=\footnotesize,below=of 1addnl] (2addnl) {2};
+                        \node[text centered,font=\footnotesize,below=of 2addnl,execute at begin node=\color{black}$\vdots$] (contaddnl) {};
+                \end{scope}
+                \node[anchor=west,] (train) at ($(addnl.east)+(0.5cm,-0.15cm)$) {Training Set};
+                \begin{scope}[every node/.style={rectangle,node distance=0.2cm,anchor=west,inner sep=0.2mm},shift={($(train.south west) + (0,-0.05cm)$)}]
+                        %1 addnl train set
+                        \node[draw,red] (train1a) at (0,-0.3){A};
+                        \node[draw,blue,right=of train1a] (train1b) {B};
+                                \node[fit=(train1a) (train1b),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+
+
+                        %2 addnl train set
+                        \node[draw,red,below=1.1cm of train1a] (train2a){A};
+                        \node[draw,blue,right=of train2a] (train2b) {B};
+                                \node[fit=(train2a) (train2b),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[draw,red,right=of train2b] (train2a2){A};
+                        \node[draw,blue,right=of train2a2] (train2c) {C};
+                                \node[fit=(train2a2) (train2c),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[draw,blue,below=0.5cm of $(train2a)!0.5!(train2a2)$] (train2b2) {B};
+                        \node[draw,blue,right=of train2b2] (train2c2) {C};
+                        \node[fit=(train2b2) (train2c2),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] (lastbox) {};
+
+                        \node[text centered,font=\footnotesize,below=0.4cm of lastbox,execute at begin node=\color{black}$\vdots$] (conttrain) {};
+                \end{scope}
+                \node[anchor=north west,right=1.3cm of train] (test) {Test Set};
+                \begin{scope}[every node/.style={node distance=0.2cm,anchor=west,inner sep=0.2mm},shift={($(test.south west) + (0,-0.1cm)$)}]
+                        \node[rectangle,draw,red] (test1a) at (0,-0.3){A};
+                        \node[circle,draw,blue,right=of test1a] (test1c) {C};
+                                \node[fit=(test1a) (test1c),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,red,right=of test1c] (test1a2) {A};
+                        \node[circle,draw,blue,right=of test1a2] (test1d) {D};
+                                \node[fit=(test1a2) (test1d),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,red,right=of test1d] (test1a3) {A};
+                        \node[circle,draw,blue,right=of test1a3] (test1e) {E};
+                                \node[fit=(test1a3) (test1e),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,blue,below=of test1a] (test1b) {B};
+                        \node[circle,draw,blue,right=of test1b] (test1c2) {C};
+                                \node[fit=(test1b) (test1c2),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,blue,right=of test1c2] (test1b2) {B};
+                        \node[circle,draw,blue,right=of test1b2] (test1d2) {D};
+                                \node[fit=(test1b2) (test1d2),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,blue,right=of test1d2] (test1b3) {B};
+                        \node[circle,draw,blue,right=of test1b3] (test1e2) {E};
+                                \node[fit=(test1b3) (test1e2),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+
+
+                        \node[rectangle,draw,red,below=1.1cm of test1a] (test2a){A};
+                        \node[circle,draw,blue,right=of test2a] (test2d) {D};
+                                \node[fit=(test2a) (test2d),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,red,right=of test2d] (test2a2){A};
+                        \node[circle,draw,blue,right=of test2a2] (test2e) {E};
+                                \node[fit=(test2a2) (test2e),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,blue,below=of test2a] (test2b) {B};
+                        \node[circle,draw,blue,right=of test2b] (test2d2) {D};
+                                \node[fit=(test2b) (test2d2),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,blue,right=of test2d2] (test2b2) {B};
+                        \node[circle,draw,blue,right=of test2b2] (test2e2) {E};
+                                \node[fit=(test2b2) (test2e2),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] {};
+                        \node[rectangle,draw,blue,below=of test2b] (test2c) {C};
+                        \node[circle,draw,blue,right=of test2c] (test2d2) {D};
+                                \node[fit=(test2c) (test2d2),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] (seclastbox) {};
+                        \node[rectangle,draw,blue,right=of test2d2] (test2c2) {C};
+                        \node[circle,draw,blue,right=of test2c2] (test2e2) {E};
+                                \node[fit=(test2c2) (test2e2),inner sep=0.5mm,draw,forestgreen,densely dotted,thick] (lastbox) {};
+
+                        \node[text centered,font=\footnotesize,below=0.3cm of $(seclastbox)!0.5!(lastbox)$,execute at begin node=\color{black}$\vdots$] (conttest) {};
+                \end{scope}
+        \end{scope}
+        \draw [-,thick] ($(addnl.south west) + (-0.1,0.05)$) -- ($(test.south east) + (2,0cm)$);
+        \draw[dotted,black!50,draw,ultra thick,local bounding box=addnl wrapper] ($(addnleval.north west) + (-0.2,0)$) rectangle ($(conttest.east)+(2.4,-.75)$);
+
+        %PFAM Evaluation
+        \begin{scope}[every node/.style={anchor=west},shift={(9.6,1)}]
+                \node[font=\large] (pfameval) at (0,0) {Leave One Protein Family Out CV:};
+                \node (noshot) at (0,-0.5) {\underline{No-shot:}};
+
+                %First CV
+                \begin{scope}[every node/.style={anchor=west,circle,blue!50!red,inner sep=0mm,draw,text width=0.8cm,text centered,font=\tiny},yshift=-0.7cm]
+                        \foreach \cent / \cval [count=\name] in {(0.1,0)/fblue,(1.2,.2)/acidgreen,(0,-1.1)/pppizzaz}
+                        \node[fill=\cval!50,yshift=-1cm] (pfam\name) at \cent {Protein Family \name};
+
+                        \node[fill=zbrown!50,label={[black,font=\footnotesize]50:Test Set}] (lastpfam) at (1.9,-2.2){Protein Family 60};
+
+                \end{scope}
+                \node[text centered,font=\footnotesize,below=-.2cm of pfam3,execute at begin node=\color{black}$\vdots$] (dots1) {};
+                \node[text centered,font=\footnotesize,below right=-.2cm of pfam1.south east,execute at begin node=\color{black}$\ddots$] (dots2) {};
+                \node[text centered,font=\footnotesize,right=-.1cm of pfam2,execute at begin node=\color{black}$\dots$] (dots4) {};
+                \draw[green,densely dotted,very thick,] ($(pfam1.north west) + (0.1,0.2)$) to[out=210,in=90] (pfam3.west) to[out=270,in=180] (dots1.south) 
+                         to[out=35,in=235] (dots4.east) to[out=80,in=0] (pfam2.north) node[above right,text=black,font=\footnotesize] {Training Set} to[out=180,in=0] ($(pfam1.north west) + (0.1,0.2)$); 
+                \draw[alloyorange,densely dotted,very thick,] ($(lastpfam.north) + (0,0.05)$) to[out=180,in=90] ($(lastpfam.west) +(-0.05,0)$) to[out=270,in=180] ($(lastpfam.south) + (0,-0.05)$) 
+                        to[out=0,in=270] ($(lastpfam.east) + (0.05,0)$) to[out=90,in=0] ($(lastpfam.north) + (0,0.05)$); 
+                \node[text centered,font=\footnotesize,right=0.6cm of lastpfam,execute at begin node=\color{black}$\dots$] (nextdots) {};
+
+                
+                %third CV
+                \begin{scope}[xshift=4.5cm,yshift=-0.5cm]
+                        \begin{scope}[every node/.style={anchor=west,circle,blue!50!red,inner sep=0mm,draw,text width=0.8cm,text centered,font=\tiny}]
+                                \node[yshift=-1cm,label={[black,yshift=0cm,font=\footnotesize]100:Test Set}] at (0.1,0) {Protein Family 1};
+                                \foreach \cent / \cval [count=\name] in {(0.1,0)/fblue,(1.2,.2)/acidgreen,(0,-1.1)/pppizzaz}
+                                \node[fill=\cval!50,yshift=-1cm] (pfam\name) at \cent {Protein Family \name};
+
+                                \node[fill=zbrown!50] (lastpfam) at (1.9,-2.2){Protein Family 60};
+
+                        \end{scope}
+                        \node[text centered,font=\footnotesize,below=-.2cm of pfam3,execute at begin node=\color{black}$\vdots$] (dots1) {};
+                        \node[text centered,font=\footnotesize,below right=-.2cm of pfam1.south east,execute at begin node=\color{black}$\ddots$] (dots2) {};
+                        \node[text centered,font=\footnotesize,right=-.1cm of pfam2,execute at begin node=\color{black}$\dots$] (dots4) {};
+                        \draw[green,densely dotted,very thick] ($(pfam1.south east) + (0.15,0.15)$) to[out=250,in=30] (pfam3.north west) to[out=230,in=180] (dots1.south) 
+                                node[below right,text=black,font=\footnotesize] {Training Set} to[out=5,in=270] (lastpfam.east) to[out=100,in=-40] (dots4.east) to[out=135,in=-15]
+                                (pfam2.north) to[out=185,in=80] ($(pfam1.south east) + (0.15,0.15)$);
+                \draw[alloyorange,densely dotted, very thick,] ($(pfam1.north) + (0,0.05)$) to[out=180,in=90] ($(pfam1.west) +(-0.05,0)$) to[out=270,in=180] ($(pfam1.south) + (0,-0.05)$) 
+                        to[out=0,in=270] ($(pfam1.east) + (0.05,0)$) to[out=90,in=0] ($(pfam1.north) + (0,0.05)$); 
+                \end{scope}
+
+                %Fewshot
+                %First CV
+                \begin{scope}[yshift=-4.3cm]
+                \node (fshot) at (0,0) {\underline{Few-shot:} (1 Additional Ligand Example)};
+                \begin{scope}[every node/.style={anchor=west,circle,blue!50!red,inner sep=0mm,draw,text width=0.8cm,text centered,font=\tiny},yshift=-0.4cm]
+                        \foreach \cent / \cval [count=\name] in {(0.1,0)/fblue,(1.2,.2)/acidgreen,(0,-1.1)/pppizzaz}
+                        \node[fill=\cval!50,yshift=-1cm] (fspfam\name) at \cent {Protein Family \name};
+
+                        \node[fill=zbrown!50,label={[black,font=\footnotesize]50:Test Set}] (lastfspfam) at (1.9,-2.2){Protein Family 60};
+
+                \end{scope}
+                \node[text centered,font=\footnotesize,below=-.2cm of fspfam3,execute at begin node=\color{black}$\vdots$] (dots1) {};
+                \node[text centered,font=\footnotesize,below right=-.2cm of fspfam1.south east,execute at begin node=\color{black}$\ddots$] (dots2) {};
+                \node[text centered,font=\footnotesize,right=-.1cm of fspfam2,execute at begin node=\color{black}$\dots$] (dots4) {};
+                \draw[green,densely dotted,very thick,] ($(fspfam1.north west) + (0.1,0.2)$) to[out=210,in=90] (fspfam3.west) to[out=270,in=180] (dots1.south) 
+                         to[out=35,in=235] (dots4.east) to[out=80,in=0] (fspfam2.north) node[above right,text=black,font=\footnotesize] {Training Set} to[out=180,in=0] ($(fspfam1.north west) + (0.1,0.2)$); 
+                \draw[alloyorange,densely dotted,very thick,] ($(lastfspfam.north) + (0,0.05)$) to[out=180,in=90] ($(lastfspfam.west) +(-0.05,0)$) to[out=270,in=180] ($(lastfspfam.south) + (0,-0.05)$) 
+                        to[out=0,in=270] ($(lastfspfam.east) + (0.05,0)$) to[out=90,in=0] ($(lastfspfam.north) + (0,0.05)$); 
+                \draw[-stealth,blue!50!red,very thick] (lastfspfam.south)  .. controls (1.4,-3.8)  .. node[below right,font=\small] {2 Ligands} ($(dots1.south east)+(0.1,0.4)$);
+                \node[text centered,font=\footnotesize,right=0.6cm of lastfspfam,execute at begin node=\color{black}$\dots$] (nextdots) {};
+
+                %third CV
+                \begin{scope}[xshift=4.5cm,yshift=-0.4cm]
+                        \begin{scope}[every node/.style={anchor=west,circle,blue!50!red,inner sep=0mm,draw,text width=0.8cm,text centered,font=\tiny}]
+                                \node[yshift=-1cm,label={[black,yshift=0cm,font=\footnotesize]100:Test Set}] at (0.1,0) {Protein Family 1};
+                                \foreach \cent / \cval [count=\name] in {(0.1,0)/fblue,(1.2,.2)/acidgreen,(0,-1.1)/pppizzaz}
+                                \node[fill=\cval!50,yshift=-1cm] (fspfam\name) at \cent {Protein Family \name};
+
+                                \node[fill=zbrown!50] (lastfspfam) at (1.9,-2.2){Protein Family 60};
+                        \end{scope}
+                        \node[text centered,font=\footnotesize,below=-.2cm of fspfam3,execute at begin node=\color{black}$\vdots$] (dots1) {};
+                        \node[text centered,font=\footnotesize,below right=-.2cm of fspfam1.south east,execute at begin node=\color{black}$\ddots$] (dots2) {};
+                        \node[text centered,font=\footnotesize,right=-.1cm of fspfam2,execute at begin node=\color{black}$\dots$] (dots4) {};
+                        \draw[green,densely dotted,very thick] ($(fspfam1.south east) + (0.15,0.15)$) to[out=250,in=30] (fspfam3.north west) to[out=230,in=180] (dots1.south) 
+                                node[below right,text=black,font=\footnotesize] {Training Set} to[out=5,in=270] (lastfspfam.east) to[out=100,in=-40] (dots4.east) to[out=135,in=-15]
+                                (fspfam2.north) to[out=185,in=80] ($(fspfam1.south east) + (0.15,0.15)$);
+                        \draw[alloyorange,densely dotted,very thick,] ($(fspfam1.north) + (0,0.05)$) to[out=180,in=90] ($(fspfam1.west) +(-0.05,0)$) to[out=270,in=180] ($(fspfam1.south) + (0,-0.05)$) 
+                                to[out=0,in=270] ($(fspfam1.east) + (0.05,0)$) to[out=90,in=0] ($(fspfam1.north) + (0,0.05)$); 
+                        \draw[-stealth,blue!50!red,very thick] (fspfam1.north east)  .. controls (1.8,0)  .. node[above=-0.05cm,font=\small] {2 Ligands} (dots4.north);
+                \end{scope}
+                \end{scope}
+        \end{scope}
+        \draw[dotted,black!50,draw,ultra thick,local bounding box=pfam wrapper] ($(pfameval.north west) + (-0.2,0)$) rectangle ($(lastfspfam.east)+(0.2,-1.5)$);
+
+        %External Sets
+        \begin{scope}[every node/.style={anchor=west},shift={(6.0,-8.0)}]
+                \node[font=\large] (extsetseval) at (-0.3,-0.05) {External Datasets Evaluation:}; 
+                \node[rectangle,draw,rounded corners,inner sep=0.5mm,text width=2.7cm,text badly centered] (fullytrained) at (0,-2.5) {Siamese Network Trained on \underline{All} BindingDB Data};
+                \node[regular polygon, regular polygon sides=7,text width=2cm, text badly centered,draw,tblue,inner sep=0mm,font=\footnotesize] (eval) at (7.9,-2.5) {Evaluate on congeneric series remaining after removing 7 ligands};
+
+                \begin{scope}[shift={(-1.7,0)}]
+                        \node[text width=2 cm, text centered,ellipse,densely dotted,draw,inner sep=0.2mm] (noshot) at (5.5,-0.8){no finetune (no-shot)};
+                        \draw[-stealth] (fullytrained.east) to[out=0,in=225] (4.9,-1.1) to[out=45,in=180] (noshot.west);
+                        \draw[-stealth] (noshot.east) to[out=0,in=135] (9.2,-1.1) to[out=315,in=180] (eval.west);
+                        \begin{scope}[yshift=-0.2cm,xshift=-0.2cm]
+                        \node[text width=1.2 cm, text centered,ellipse,densely dotted,draw,inner sep=0.2mm,minimum width=0.7cm,minimum height=0.7cm,label={[yshift=0.6cm]270:2 ligands}] (finetune1) at (6.4,-1.9){};
+                        \draw[-stealth] (fullytrained.east) to[out=0,in=180] (finetune1.west);
+                        \draw[-stealth] (finetune1.east) to[out=0,in=180] (eval.west);
+                        \node[text width=2 cm, text centered,ellipse,densely dotted,draw,inner sep=0.2mm,minimum width=2cm,minimum height=1.4cm,label={[yshift=0.5cm]270:3 ligands}] (finetune2) at (5.83,-2.2){};
+                        \draw[-stealth] (fullytrained.east) to[out=0,in=180] (finetune2.west);
+                        \draw[-stealth] (finetune2.east) to[out=0,in=180] (eval.west);
+
+                        \node[text centered,below=-0.3cm of finetune2,execute at begin node=\color{black}$\vdots$] (nextdots) {};
+                        \node[text width=2 cm, text centered,ellipse,densely dotted,draw,inner sep=0.2mm,minimum width=4cm,minimum height=2.3cm,label={[yshift=0.5cm]270:7 ligands}] (finetune7) at (5.3,-2.6){};
+                        \end{scope}
+                        \draw[-stealth] (fullytrained.east) to[out=0,in=180] (finetune7.west);
+                        \draw[-stealth] (finetune7.east) to[out=0,in=180] (eval.west);
+
+                        
+                        \node[fit=(finetune1) (finetune7),rounded corners,densely dotted,draw,red!75,thick,label={[text width=6.5cm,text badly centered]below:3 Epoch Finetune Stratified with BindingDB Data}] (finetune block) {};
+                \end{scope}
+        \end{scope}
+        \draw[dotted,black!50,draw,ultra thick] ($(extsetseval.north west) + (0.0,0.05)$) rectangle ($(eval.east)+(0.4,-2.6)$);
+	\draw[-latex,very thick] ($(ext wrapper.east) + (0.23,0.1)$) to[out=-45,in=195] ($(finetune block.south west) + (0,0.2)$);
+
+	%arrows from bdb box
+	\draw [-latex,very thick](bdb border.east) -- ($(addnl wrapper.south east) +(-1.37,0)$);
+	\draw [-latex,very thick]($(bdb border.east)+(0,0)$) -- ($(pfam wrapper.south west) + (0,2.7)$);
+	\draw[-latex,very thick] ($(bdb border.east)+(0,0)$) -- ($(extsetseval.north west) + (1.8,0)$ );
+
+        
+
+\end{tikzpicture}           
+\end{document}

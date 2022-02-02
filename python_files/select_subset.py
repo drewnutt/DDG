@@ -37,6 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('-N',required=True,type=int,help='number of test ligands to include in the train file')
     parser.add_argument('-S','--random_seed',default=42,type=int,help='random seed')
     parser.add_argument('--test_subset',action='store_true',default=False,help='keep a subset of the test data, will only work if N>=6')
+    parser.add_argument('--test_addnl',action='store_true',default=False,help='keep a subset of the test data that has combos of train-test')
     parser.add_argument('--stratify',action='store_true',default=False,help='Make a column that denotes the stratification of the two sets')
     args = parser.parse_args()
 
@@ -93,6 +94,12 @@ if __name__ == '__main__':
         if len(leftover):
             print(f"{args.test.split('.')[0]}_TE.types")
             leftover.to_csv(f"{args.test.split('.')[0]}_TE.types", sep=' ' , header=False,index=False,float_format='%.4f')
+    if not failed and args.test_addnl:
+        leftover = og_test_data.drop(index=tt_comp.index)
+        if len(leftover):
+            ligs = tt_comp['lig1'].tolist() + tt_comp['lig2'].tolist()
+            train_test_combos = leftover[(leftover['lig1'].isin(ligs)) | (leftover['lig2'].isin(ligs))].copy()
+            train_test_combos.to_csv(f"{args.test.split('.')[0]}_TT.types", sep=' ', header=False, index=False, float_format="%.4f")
     if args.stratify:
         train_data = pd.read_table(args.train, sep=' ', header=None)
         train_data['strat'] = 1

@@ -1,0 +1,16 @@
+\begin{tabular}{l l l l} 
+\toprule 
+ Ablation & Pearson's R & RMSE (pK) & MAE (pK) \\ \midrule 
+Standard & $\mathbf{0.553 (\pm 0.0233)}$ & $\mathbf{1.11 (\pm 0.0309)}$ & $\mathbf{0.82 (\pm 0.0187)}$ \\ 
+No $L_{\Delta\Delta G}$ & $\mathbf{0.551 (\pm 0.0202)}$ & $\mathbf{1.12 (\pm 0.0248)}$ & $\mathbf{0.829 (\pm 0.0179)}$ \\ 
+No $L_{\Delta G}$ & $0.459 (\pm 0.0238)$ & $1.27 (\pm 0.0289)$ & $0.945 (\pm 0.0182)$ \\ 
+No $L_{\mathrm{rotation}}$ & $\mathbf{0.556 (\pm 0.0188)}$ & $\mathbf{1.11 (\pm 0.0233)}$ & $\mathbf{0.819 (\pm 0.0162)}$ \\ 
+No $L_{\mathrm{consistency}}$ & $\mathbf{0.536 (\pm 0.021)}$ & $1.14 (\pm 0.0356)$ & $0.842 (\pm 0.0186)$ \\ 
+No $L_{\Delta\Delta G}$, $L_{\mathrm{consistency}}$ & $-0.0576 (\pm 0.136)$ & $1.24 (\pm 0.0143)$ & $0.908 (\pm 0.0144)$ \\ 
+No $L_{\Delta G}$, $L_{\mathrm{consistency}}$ & $0.456 (\pm 0.0231)$ & $1.28 (\pm 0.0319)$ & $0.95 (\pm 0.0233)$ \\ 
+Concatenation & $\mathbf{0.554 (\pm 0.0134)}$ & $\mathbf{1.11 (\pm 0.0223)}$ & $\mathbf{0.821 (\pm 0.0174)}$ \\ 
+No Siamese Network & $0.5 (\pm 0.0347)$ & $1.15 (\pm 0.0362)$ & $0.854 (\pm 0.021)$ \\ 
+Subtraction, Single-order & $0.512 (\pm 0.0213)$ & $1.17 (\pm 0.0213)$ & $0.877 (\pm 0.0151)$ \\ 
+Concatentation, Single-order & $0.476 (\pm 0.023)$ & $1.21 (\pm 0.0253)$ & $0.907 (\pm 0.0182)$ \\ 
+\bottomrule 
+ \end{tabular}
