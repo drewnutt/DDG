@@ -36,7 +36,7 @@ parser.add_argument('--rho',default=0.05,type=float,help='rho to use with the Sh
 parser.add_argument('--adaptive_SAM',default=False,action='store_true',help='use Adaptive Sharpness Aware Minimization')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
-parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'latent_paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense','multtask_latent_def2018_concat', 'multtask_latent_dense_concat','multtask_latent_equiv_def2018','multtask_latent_equiv2_def2018'], help='Network architecture to use')
+parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'latent_paper', 'multtask_latent_def2018', 'multtask_latent_dense','multtask_latent_def2018_concat', 'multtask_latent_dense_concat','multtask_latent_equiv_def2018','multtask_latent_equiv2_def2018', 'def2018_triplet'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=1024,type=int,help='size of fully connected layer before subtraction in latent space')
@@ -47,6 +47,7 @@ parser.add_argument('--rotation_loss_weight','-R',default=1.0,type=float,help='w
 parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help='weight to use in adding the consistency term to the other losses (default: %(default)d')
 parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
 parser.add_argument('--ddg_loss_weight','-D',default=1.0,type=float,help='weight to use in adding the DDG loss terms to the other losses (default: %(default)d')
+parser.add_argument('--cycle_loss_weight','-O',default=1.0,type=float,help='weight to use in adding the Cycle consistency loss terms to the other losses (default: %(default)d')
 parser.add_argument('--latent_loss',default='mse', choices=['mse','corr'],help='what type of loss to apply to the latent representations')
 parser.add_argument('--crosscorr_lambda', type=float, help='lambda value to use in the Cross Correlation Loss')
 parser.add_argument('--train_type',default='no_SS', choices=['no_SS','SS_simult_before','SS_simult_after'],help='what type of training loop to use') ## Delete this after running all addnl_ligs on 25
@@ -62,29 +63,23 @@ parser.add_argument('--no_wandb',default=False, action='store_true', help='do no
 args = parser.parse_args()
 
 if args.use_model == 'paper':
-    from paper_model import Net
+    from models.paper_model import Net
 elif args.use_model == 'latent_paper':
-    from paper_latent_model import Net
-elif args.use_model == 'def2018':
-    from default2018_model import Net
-elif args.use_model == 'extend_def2018':
-    from extended_default2018_model import Net
-elif args.use_model == 'multtask_def2018':
-    from multtask_def2018_model import Net
+    from models.paper_latent_model import Net
 elif args.use_model == 'multtask_latent_def2018':
-    from multtask_latent_def2018_model import Net
+    from models.multtask_latent_def2018_model import Net
+elif args.use_model == 'def2018_triplet':
+    from models.def2018_triplet_model import Net
 elif args.use_model == 'multtask_latent_def2018_concat':
-    from multtask_latent_def2018_concat_model import Net
+    from models.multtask_latent_def2018_concat_model import Net
 elif args.use_model == 'multtask_latent_dense_concat':
-    from multtask_latent_dense_concat_model import Dense as Net
+    from models.multtask_latent_dense_concat_model import Dense as Net
 elif args.use_model == 'multtask_latent_dense':
-    from multtask_latent_dense_model import Dense as Net
-elif args.use_model == 'ext_mult_def2018':
-    from extended_multtask_def2018_model import Net
+    from models.multtask_latent_dense_model import Dense as Net
 elif args.use_model == 'multtask_latent_equiv_def2018':
-    from multtask_latent_equiv_def2018_model import Net
+    from models.multtask_latent_equiv_def2018_model import Net
 elif args.use_model == 'multtask_latent_equiv2_def2018':
-    from multtask_latent_equiv2_def2018_model import Net
+    from models.multtask_latent_equiv2_def2018_model import Net
 
 def weights_init(m):
     if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
@@ -129,27 +124,6 @@ class LARS(torch.optim.Optimizer):
 
                 p.add_(mu, alpha=-g['lr'])
 
-class CrossCorrLoss(nn.Module):    
-    def __init__(self, rep_size, lambd, device='cpu'):    
-        super(CrossCorrLoss,self).__init__()    
-        self.bn = nn.BatchNorm1d(rep_size, affine=False).to(device)    
-        self.device = device
-        self.lambd = lambd    
-        
-    def forward(self, z1, z2):    
-        z1 = z1.to(self.device)
-        z2 = z2.to(self.device)
-        c = self.bn(z1).T @ self.bn(z2)    
-        on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()    
-            
-        n, m = c.shape    
-        assert n == m    
-        off_diagonals = c.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()    
-        off_diag = off_diagonals.pow_(2).sum()    
-           
-        loss = on_diag + self.lambd * off_diag    
-        return loss
-
 class Projector(nn.Module):
     def __init__(self, rep_size, final_dim,layers=3):
         super(Projector, self).__init__()
@@ -173,59 +147,57 @@ class Projector(nn.Module):
 
 def train(model, traine, optimizer, latent_rep, epoch, proj=None):
     model.train()
-    full_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
+    full_loss, lig_loss, rot_loss, DDG_loss, cycle_loss = 0, 0, 0, 0, 0
 
     output_dist, actual = [], []
     lig_pred, lig_labels = [], []
     for idx, batch in enumerate(traine):
+        optimizer.zero_grad()
         it = num_iters_pe * epoch + idx
+
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=args.no_rot_train) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-        batch.extract_label(1, float_labels)
-        labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
-        optimizer.zero_grad()
-        batch.extract_label(2, lig1_label)
-        batch.extract_label(3, lig2_label)
-        lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
-        lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
-        if latent_rep:
-            output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
-            # ddg_lig1, dg1_lig1, dg2_lig1, lig1_rep1, lig1_rep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            # ddg_lig2, dg1_lig2, dg2_lig2, lig2_rep1, lig2_rep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            if proj:
-                lig1_rep1 = proj(lig1_rep1)
-                lig1_rep2 = proj(lig1_rep2)
-                lig2_rep1 = proj(lig2_rep1)
-                lig2_rep2 = proj(lig2_rep2)
-            rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
-            rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
-        else:
-            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-            rotation_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
-            rotation_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
-            del ddg_lig1, dg1_lig1, dg2_lig1, ddg_lig2, dg1_lig2, dg2_lig2 
-            torch.cuda.empty_cache()
-            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-        loss_lig1 = criterion_lig1(lig1, lig1_labels)
-        loss_lig2 = criterion_lig2(lig2, lig2_labels)
-        ddg_loss = criterion(output, labels)
-        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight[it] * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
-        lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
-        lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
-        lig_loss += loss_lig1 + loss_lig2
+
+        batch.extract_label(0, float_labels)
+        batch.extract_label(1, lig1_label)
+        batch.extract_label(2, lig2_label)
+        lig1_labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
+        lig2_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
+        lig3_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
+        diff1_labels = ( lig1_labels - lig2_labels ).detach().clone()
+        diff2_labels = (lig2_labels - lig3_labels).detach().clone()
+        diff3_labels = (lig3_labels - lig1_labels).detach().clone()
+
+        ddg1, ddg2, ddg3, lig1, lig2, lig3, lig1_rep1, lig2_rep1, lig3_rep1 = model(input_tensor_1[:,:28,:,:,:],input_tensor_1[:,28:56,:,:,:],input_tensor_1[:,56:,:,:,:])
+        _, _, _, _, _, _, lig1_rep2, lig2_rep2, lig3_rep2 =  model(input_tensor_2[:,:28,:,:,:],input_tensor_2[:,28:56,:,:,:],input_tensor_2[:,56:,:,:,:])
+        rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
+        rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
+        rotation_loss += nn.functional.mse_loss(lig3_rep1, lig3_rep2)
+        loss_lig1 = nn.functional.mse_loss(lig1, lig1_labels)
+        loss_lig2 = nn.functional.mse_loss(lig2, lig2_labels)
+        loss_lig3 = nn.functional.mse_loss(lig3, lig3_labels)
+        ddg1_loss = nn.functional.mse_loss(ddg1, diff1_labels)
+        ddg2_loss = nn.functional.mse_loss(ddg2, diff2_labels)
+        ddg3_loss = nn.functional.mse_loss(ddg3, diff3_labels)
+        cycle_consistency = nn.functional.mse_loss((ddg1-ddg2-ddg3),torch.zeros((batch_size,1),device='cuda'))
+        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2 + loss_lig3) + \
+                args.ddg_loss_weight * ( ddg1_loss + ddg2_loss + ddg3_loss ) + \
+                args.rotation_loss_weight[it] * rotation_loss + \
+                args.consistency_loss_weight * ( nn.functional.mse_loss((lig1-lig2), ddg1) + nn.functional.mse_loss((lig2-lig3), ddg2) + nn.functional.mse_loss((lig3-lig1), ddg3) ) +  \
+                args.cycle_loss_weight * cycle_consistency
+        lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist() + lig3.flatten().tolist()
+        lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist() + lig3_labels.flatten().tolist()
+        lig_loss += loss_lig1 + loss_lig2 + loss_lig3
         rot_loss += rotation_loss
-        DDG_loss += ddg_loss
+        DDG_loss += ddg1_loss + ddg2_loss + ddg3_loss
+        cycle_loss += cycle_consistency.detach()
         full_loss += loss
         loss.backward()
         if args.clip > 0:
             nn.utils.clip_grad_norm_(model.parameters(),args.clip)
         optimizer.step()
-        output_dist += output.flatten().tolist()
-        actual += labels.flatten().tolist()
+        output_dist += ddg1.flatten().tolist() + ddg2.flatten().tolist() + ddg3.flatten().tolist()
+        actual += diff1_labels.flatten().tolist() + diff2_labels.flatten().tolist() + diff3_labels.flatten().tolist()
         if args.print_out:
             print(f'Train:{epoch}')
             for example in range(len(labels)):
@@ -249,11 +221,12 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
         r = (tmp,np.nan)
     rmse = np.sqrt(((np.array(output_dist)-np.array(actual)) ** 2).mean())
     avg_loss = full_loss/(total_samples)
-    avg_lig_loss = lig_loss / (2*total_samples)
+    avg_lig_loss = lig_loss / (3*total_samples)
     avg_rot_loss = rot_loss / (total_samples)
-    avg_DDG_loss = DDG_loss / (total_samples)
+    avg_DDG_loss = DDG_loss / (3*total_samples)
+    avg_cycle_loss = cycle_loss / (total_samples)
     tmp = avg_loss
-    avg_loss = (tmp,avg_lig_loss,avg_DDG_loss,avg_rot_loss,None)
+    avg_loss = (tmp,avg_lig_loss,avg_DDG_loss,avg_rot_loss,avg_cycle_loss)
     rmse_ligs = np.sqrt(((np.array(lig_pred)-np.array(lig_labels)) ** 2).mean())
     tmp = rmse
     rmse = (rmse, rmse_ligs)
@@ -271,40 +244,26 @@ def test(model, test_data, latent_rep, epoch, proj=None):
     with torch.no_grad():
         for idx, batch in enumerate(test_data):        
             it = num_iters_pe * epoch + idx
-            gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=True) 
-            gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
-            batch.extract_label(1, float_labels)
-            labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
-            optimizer.zero_grad()
-            batch.extract_label(2, lig1_label)
-            batch.extract_label(3, lig2_label)
+
+            gmaker_test.forward(batch, input_test_1, random_translation=2.0, random_rotation=True) 
+            gmaker_test.forward(batch, input_test_2, random_translation=2.0, random_rotation=True) 
+
+            batch.extract_label(0, lig1_label)
+            batch.extract_label(1, lig2_label)
             lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
             lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
-            if latent_rep:
-                output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-                output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
-                # ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-                # ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-                if proj:
-                    lig1_rep1 = proj(lig1_rep1)
-                    lig1_rep2 = proj(lig1_rep2)
-                    lig2_rep1 = proj(lig2_rep1)
-                    lig2_rep2 = proj(lig2_rep2)
-                rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
-                rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
-            else:
-                output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-                ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-                rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-                ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-                rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-                zero_tensor = torch.zeros(ddg_lig1.size()).to("cuda:0")
-                rotation_loss += ddgrotloss1(ddg_lig1, zero_tensor) 
-                rotation_loss += ddgrotloss2(ddg_lig2, zero_tensor) 
+            labels = (lig1_labels - lig2_labels).detach().clone()
+
+            output, _, _, lig1, lig2, _, lig1_rep1, lig2_rep1, _= model(input_test_1[:, :28, :, :, :], input_test_1[:, 28:, :, :, :],input_test_1[:,:28,:,:,:])
+            _, _, _, _, _, _, lig1_rep2, lig2_rep2, _ = model(input_test_2[:, :28, :, :, :], input_test_2[:, 28:, :, :, :],input_test_2[:,:28,:,:,:])
+
+            rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
+            rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
             loss_lig1 = criterion_lig1(lig1, lig1_labels)
             loss_lig2 = criterion_lig2(lig2, lig2_labels)
             ddg_loss = criterion(output, labels)
             loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight[it] * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
+
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
             lig_loss += loss_lig1 + loss_lig2
@@ -377,25 +336,27 @@ epochs = args.epoch
 iter_scheme = molgrid.IterationScheme.SmallEpoch
 if args.iter_scheme == 'large':
     iter_scheme = molgrid.IterationScheme.LargeEpoch
-if args.stratify:
-    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_pos=0, stratify_min=0, stratify_max=1, stratify_step=.5, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
-else:
-    traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
+
+traine = molgrid.ExampleProvider(ligmolcache=args.ligtr, recmolcache=args.rectr, data_root=args.train_dataroot, stratify_receptor=args.stratify_rec, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=iter_scheme)
 traine.populate(args.trainfile)
+
 teste = molgrid.ExampleProvider(ligmolcache=args.ligte, recmolcache=args.recte, shuffle=True, duplicate_first=True, default_batch_size=batch_size, iteration_scheme=molgrid.IterationScheme.LargeEpoch)
 teste.populate(args.testfile)
 
 gmaker = molgrid.GridMaker(binary=args.binary_rep)
-dims = gmaker.grid_dimensions(14*4)  # only one rec+onelig per example
+gmaker_test = molgrid.GridMaker(binary=args.binary_rep)
+test_dims = gmaker_test.grid_dimensions(14*4)  # rec duplicated for all two ligs -> 28*2 for test
+dims = gmaker.grid_dimensions(28*3)  # rec duplicated for all three ligs -> 28*3 for train
 tensor_shape = (batch_size,)+dims
+test_tensor_shape = (batch_size,)+test_dims
 
-actual_dims = (dims[0]//2, *dims[1:])
+actual_dims = (test_dims[0]//2, *dims[1:])
 model = Net(actual_dims,args)
-if torch.cuda.device_count() > 1:
-        print("Using {} GPUs".format(torch.cuda.device_count()))
-        model = nn.DataParallel(model)
-else:
-        print('GPUS: {}'.format(torch.cuda.device_count()), flush=True)
+# if torch.cuda.device_count() > 1:
+#         print("Using {} GPUs".format(torch.cuda.device_count()))
+#         model = nn.DataParallel(model)
+# else:
+#         print('GPUS: {}'.format(torch.cuda.device_count()), flush=True)
 model.to('cuda')
 print('done moving model')
 model.apply(weights_init)
@@ -486,6 +447,8 @@ input_tensor_2 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 float_labels = torch.zeros(batch_size, dtype=torch.float32)
 lig1_label = torch.zeros(batch_size, dtype=torch.float32)
 lig2_label = torch.zeros(batch_size, dtype=torch.float32)
+input_test_1 = torch.zeros(test_tensor_shape, dtype=torch.float32, device='cuda')
+input_test_2 = torch.zeros(test_tensor_shape, dtype=torch.float32, device='cuda')
 
 
 if not args.no_wandb:
@@ -493,8 +456,8 @@ if not args.no_wandb:
 # max_rot_weight = args.rotation_loss_weight
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
-tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep,1,proj=projector)
-print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}\n\tTest MAE:{tt_mae}')
+# tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep,1,proj=projector)
+# print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}\n\tTest MAE:{tt_mae}')
 for epoch in range(1, epochs+1):
     # if args.self_supervised_test:
     #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
@@ -551,7 +514,7 @@ for epoch in range(1, epochs+1):
            "Avg Train Loss DDG": tr_loss[2],
            "Avg Test Loss DDG": tt_loss[2],
            "Avg Train Loss Rotation": tr_loss[3],
-           "Avg Self-Supervised Train Loss Rotation": tr_loss[4],
+           "Avg Cycle Consistency Loss": tr_loss[4],
            "Avg Test Loss Rotation": tt_loss[3],
            "Train R AbsAff": float(tr_r[1]),
            "Test R AbsAff": float(tt_r[1]),
