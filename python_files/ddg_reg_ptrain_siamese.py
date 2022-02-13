@@ -158,13 +158,19 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=args.no_rot_train) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
 
-        batch.extract_label(0, float_labels)
-        batch.extract_label(1, lig1_label)
-        batch.extract_label(2, lig2_label)
-        lig1_labels = torch.unsqueeze(float_labels, 1).float().to('cuda')
-        lig2_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
-        lig3_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
-        diff1_labels = ( lig1_labels - lig2_labels ).detach().clone()
+        batch.extract_label(0, indicator_1)
+        batch.extract_label(1, indicator_2)
+        batch.extract_label(2, indicator_3)
+        batch.extract_label(3, lig1_label)
+        batch.extract_label(4, lig2_label)
+        batch.extract_label(5, lig3_label)
+        ind_1 = torch.unsqueeze(indicator_1, 1).float().to('cuda')
+        ind_2 = torch.unsqueeze(indicator_2, 1).float().to('cuda')
+        ind_3 = torch.unsqueeze(indicator_3, 1).float().to('cuda')
+        lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
+        lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
+        lig3_labels = torch.unsqueeze(lig3_label, 1).float().to('cuda')
+        diff1_labels = (lig1_labels - lig2_labels).detach().clone()
         diff2_labels = (lig2_labels - lig3_labels).detach().clone()
         diff3_labels = (lig3_labels - lig1_labels).detach().clone()
 
@@ -173,17 +179,17 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
         rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
         rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
         rotation_loss += nn.functional.mse_loss(lig3_rep1, lig3_rep2)
-        loss_lig1 = nn.functional.mse_loss(lig1, lig1_labels)
-        loss_lig2 = nn.functional.mse_loss(lig2, lig2_labels)
-        loss_lig3 = nn.functional.mse_loss(lig3, lig3_labels)
-        ddg1_loss = nn.functional.mse_loss(ddg1, diff1_labels)
-        ddg2_loss = nn.functional.mse_loss(ddg2, diff2_labels)
-        ddg3_loss = nn.functional.mse_loss(ddg3, diff3_labels)
+        loss_lig1 = torch.mean(ind_1 * nn.functional.mse_loss(lig1, lig1_labels, reduction='none'))
+        loss_lig2 = torch.mean(ind_2 * nn.functional.mse_loss(lig2, lig2_labels, reduction='none'))
+        loss_lig3 = torch.mean(ind_3 * nn.functional.mse_loss(lig3, lig3_labels, reduction='none'))
+        ddg1_loss = torch.mean((ind_1 * ind_2) * nn.functional.mse_loss(ddg1, diff1_labels, reduction='none'))
+        ddg2_loss = torch.mean((ind_2 * ind_3) * nn.functional.mse_loss(ddg2, diff2_labels, reduction='none'))
+        ddg3_loss = torch.mean((ind_3 * ind_1) * nn.functional.mse_loss(ddg3, diff3_labels, reduction='none'))
         cycle_consistency = nn.functional.mse_loss((ddg1-ddg2-ddg3),torch.zeros((batch_size,1),device='cuda'))
         loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2 + loss_lig3) + \
-                args.ddg_loss_weight * ( ddg1_loss + ddg2_loss + ddg3_loss ) + \
+                args.ddg_loss_weight * (ddg1_loss + ddg2_loss + ddg3_loss) + \
                 args.rotation_loss_weight[it] * rotation_loss + \
-                args.consistency_loss_weight * ( nn.functional.mse_loss((lig1-lig2), ddg1) + nn.functional.mse_loss((lig2-lig3), ddg2) + nn.functional.mse_loss((lig3-lig1), ddg3) ) +  \
+                args.consistency_loss_weight * (nn.functional.mse_loss((lig1-lig2), ddg1) + nn.functional.mse_loss((lig2-lig3), ddg2) + nn.functional.mse_loss((lig3-lig1), ddg3)) +  \
                 args.cycle_loss_weight * cycle_consistency
         lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist() + lig3.flatten().tolist()
         lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist() + lig3_labels.flatten().tolist()
@@ -207,10 +213,10 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
 
     total_samples = (idx + 1) * len(batch)
     try:
-        r, _=pearsonr(np.array(actual),np.array(output_dist))
+        r, _ = pearsonr(np.array(actual),np.array(output_dist))
     except ValueError as e:
         print('{}:{}'.format(epoch,e))
-        r=np.nan
+        r = np.nan
     try:
         rligs,_=pearsonr(np.array(lig_pred),np.array(lig_labels))
         temp = r
@@ -444,9 +450,12 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.7, threshol
 
 input_tensor_1 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
 input_tensor_2 = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
-float_labels = torch.zeros(batch_size, dtype=torch.float32)
+indicator_1 = torch.zeros(batch_size, dtype=torch.float32)
+indicator_2 = torch.zeros(batch_size, dtype=torch.float32)
+indicator_3 = torch.zeros(batch_size, dtype=torch.float32)
 lig1_label = torch.zeros(batch_size, dtype=torch.float32)
 lig2_label = torch.zeros(batch_size, dtype=torch.float32)
+lig3_label = torch.zeros(batch_size, dtype=torch.float32)
 input_test_1 = torch.zeros(test_tensor_shape, dtype=torch.float32, device='cuda')
 input_test_2 = torch.zeros(test_tensor_shape, dtype=torch.float32, device='cuda')
 
