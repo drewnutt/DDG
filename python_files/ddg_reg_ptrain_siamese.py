@@ -62,29 +62,29 @@ parser.add_argument('--no_wandb',default=False, action='store_true', help='do no
 args = parser.parse_args()
 
 if args.use_model == 'paper':
-    from paper_model import Net
+    from models.paper_model import Net
 elif args.use_model == 'latent_paper':
-    from paper_latent_model import Net
+    from models.paper_latent_model import Net
 elif args.use_model == 'def2018':
-    from default2018_model import Net
+    from models.default2018_model import Net
 elif args.use_model == 'extend_def2018':
-    from extended_default2018_model import Net
+    from models.extended_default2018_model import Net
 elif args.use_model == 'multtask_def2018':
-    from multtask_def2018_model import Net
+    from models.multtask_def2018_model import Net
 elif args.use_model == 'multtask_latent_def2018':
-    from multtask_latent_def2018_model import Net
+    from models.multtask_latent_def2018_model import Net
 elif args.use_model == 'multtask_latent_def2018_concat':
-    from multtask_latent_def2018_concat_model import Net
+    from models.multtask_latent_def2018_concat_model import Net
 elif args.use_model == 'multtask_latent_dense_concat':
-    from multtask_latent_dense_concat_model import Dense as Net
+    from models.multtask_latent_dense_concat_model import Dense as Net
 elif args.use_model == 'multtask_latent_dense':
-    from multtask_latent_dense_model import Dense as Net
+    from models.multtask_latent_dense_model import Dense as Net
 elif args.use_model == 'ext_mult_def2018':
-    from extended_multtask_def2018_model import Net
+    from models.extended_multtask_def2018_model import Net
 elif args.use_model == 'multtask_latent_equiv_def2018':
-    from multtask_latent_equiv_def2018_model import Net
+    from models.multtask_latent_equiv_def2018_model import Net
 elif args.use_model == 'multtask_latent_equiv2_def2018':
-    from multtask_latent_equiv2_def2018_model import Net
+    from models.multtask_latent_equiv2_def2018_model import Net
 
 def weights_init(m):
     if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
