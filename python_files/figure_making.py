@@ -45,11 +45,11 @@ def get_stats(epoch, pred_ddg, actual_ddg, pred_abs, actual_abs):
 
 def get_eval(args,model_file,return_vals=False,correlation=False):
     if args.use_model == "multtask_latent_def2018":
-        from python_files.multtask_latent_def2018_model import Net
+        from python_files.models.multtask_latent_def2018_model import Net
     elif args.use_model == "multtask_latent_dense":
-        from python_files.multtask_latent_dense_model import Dense as Net
+        from python_files.models.multtask_latent_dense_model import Dense as Net
     elif args.use_model == "multtask_latent_def2018_concat":
-        from python_files.multtask_latent_def2018_concat_model import Net
+        from python_files.models.multtask_latent_def2018_concat_model import Net
     elif args.use_model == "def2018":
         return get_eval_nosiam(args,model_file)
 
