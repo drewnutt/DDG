@@ -32,6 +32,7 @@ parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
 parser.add_argument('--solver', default="adam", choices=('adam','sgd','lars','sam'), type=str, help="solver to use")
+parser.add_argument('--swa', action='store_true', help="Use Stochastic Weight Averaging")
 parser.add_argument('--epoch',default=200,type=int,help='number of epochs to train for (default %(default)d)')
 parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use batch normalization during the training process')
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
@@ -63,16 +64,8 @@ parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb ru
 parser.add_argument('--no_wandb',default=False, action='store_true', help='do not log run with wandb')
 args = parser.parse_args()
 
-if args.use_model == 'paper':
-    from models.paper_model import Net
-elif args.use_model == 'latent_paper':
+if args.use_model == 'latent_paper':
     from models.paper_latent_model import Net
-elif args.use_model == 'def2018':
-    from models.default2018_model import Net
-elif args.use_model == 'extend_def2018':
-    from models.extended_default2018_model import Net
-elif args.use_model == 'multtask_def2018':
-    from models.multtask_def2018_model import Net
 elif args.use_model == 'multtask_latent_def2018':
     from models.multtask_latent_def2018_model import Net
 elif args.use_model == 'multtask_latent_def2018_concat':
@@ -81,8 +74,6 @@ elif args.use_model == 'multtask_latent_dense_concat':
     from models.multtask_latent_dense_concat_model import Dense as Net
 elif args.use_model == 'multtask_latent_dense':
     from models.multtask_latent_dense_model import Dense as Net
-elif args.use_model == 'ext_mult_def2018':
-    from models.extended_multtask_def2018_model import Net
 elif args.use_model == 'multtask_latent_equiv_def2018':
     from models.multtask_latent_equiv_def2018_model import Net
 elif args.use_model == 'multtask_latent_equiv2_def2018':
@@ -94,7 +85,7 @@ def weights_init(m):
         if m.bias is not None:
             init.constant_(m.bias.data, 0)
 
-def train(model, traine, optimizer, latent_rep, epoch, proj=None):
+def train(model, traine, optimizer, epoch, proj=None):
     model.train()
     full_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
 
@@ -111,28 +102,15 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
         batch.extract_label(3, lig2_label)
         lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
         lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
-        if latent_rep:
-            output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-            output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
-            # ddg_lig1, dg1_lig1, dg2_lig1, lig1_rep1, lig1_rep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            # ddg_lig2, dg1_lig2, dg2_lig2, lig2_rep1, lig2_rep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            if proj:
-                lig1_rep1 = proj(lig1_rep1)
-                lig1_rep2 = proj(lig1_rep2)
-                lig2_rep1 = proj(lig2_rep1)
-                lig2_rep2 = proj(lig2_rep2)
-            rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
-            rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
-        else:
-            ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-            rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-            ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-            rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-            rotation_loss += ddgrotloss1(ddg_lig1, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
-            rotation_loss += ddgrotloss2(ddg_lig2, torch.zeros(ddg_lig1.size(), device='cuda:0')) 
-            del ddg_lig1, dg1_lig1, dg2_lig1, ddg_lig2, dg1_lig2, dg2_lig2 
-            torch.cuda.empty_cache()
-            output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+        output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+        output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
+        if proj:
+            lig1_rep1 = proj(lig1_rep1)
+            lig1_rep2 = proj(lig1_rep2)
+            lig2_rep1 = proj(lig2_rep1)
+            lig2_rep2 = proj(lig2_rep2)
+        rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
+        rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
         loss_lig1 = criterion_lig1(lig1, lig1_labels)
         loss_lig2 = criterion_lig2(lig2, lig2_labels)
         ddg_loss = criterion(output, labels)
@@ -185,7 +163,7 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
     both_labels = (actual,lig_labels)
     return avg_loss, both_calc_distr, r, rmse, mae, both_labels
 
-def test(model, test_data, latent_rep, epoch, proj=None):
+def test(model, test_data, epoch, proj=None):
     model.eval()
     test_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
 
@@ -203,27 +181,15 @@ def test(model, test_data, latent_rep, epoch, proj=None):
             batch.extract_label(3, lig2_label)
             lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
             lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
-            if latent_rep:
-                output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-                output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
-                # ddg_lig1, dg1_lig1, dg2_lig1, lig1_selfrep1, lig1_selfrep2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-                # ddg_lig2, dg1_lig2, dg2_lig2, lig2_selfrep1, lig2_selfrep2  = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-                if proj:
-                    lig1_rep1 = proj(lig1_rep1)
-                    lig1_rep2 = proj(lig1_rep2)
-                    lig2_rep1 = proj(lig2_rep1)
-                    lig2_rep2 = proj(lig2_rep2)
-                rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
-                rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
-            else:
-                output, lig1, lig2 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-                ddg_lig1, dg1_lig1, dg2_lig1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_2[:, :28, :, :, :]) #Same rec-lig pair input to both arms, just rotated/translated differently
-                rotation_loss = dgrotloss1(dg1_lig1, dg2_lig1)
-                ddg_lig2, dg1_lig2, dg2_lig2 = model(input_tensor_1[:, 28:, :, :, :], input_tensor_2[:, 28:, :, :, :]) #Repeated for the second ligand
-                rotation_loss += dgrotloss2(dg1_lig2, dg2_lig2)
-                zero_tensor = torch.zeros(ddg_lig1.size()).to("cuda:0")
-                rotation_loss += ddgrotloss1(ddg_lig1, zero_tensor) 
-                rotation_loss += ddgrotloss2(ddg_lig2, zero_tensor) 
+            output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+            _, _, _, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
+            if proj:
+                lig1_rep1 = proj(lig1_rep1)
+                lig1_rep2 = proj(lig1_rep2)
+                lig2_rep1 = proj(lig2_rep1)
+                lig2_rep2 = proj(lig2_rep2)
+            rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
+            rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
             loss_lig1 = criterion_lig1(lig1, lig1_labels)
             loss_lig2 = criterion_lig2(lig2, lig2_labels)
             ddg_loss = criterion(output, labels)
@@ -286,10 +252,6 @@ tgs = make_tags(args) + args.tags
 if not args.no_wandb:
     wandb.init(entity='andmcnutt', project='DDG_model_Regression',config=args, tags=tgs)
 
-if "latent" in args.use_model:
-    latent_rep = True
-else:
-    latent_rep = False
 #Parameters that are not important for hyperparameter sweep
 batch_size = args.batch_size
 epochs = args.epoch
@@ -347,7 +309,7 @@ projector = None
 if args.latent_loss == 'mse':
     dgrotloss1 = nn.MSELoss()
     dgrotloss2 = nn.MSELoss()
-elif latent_rep: ## only other option is 'covar' for the Barlow Twins approach, but requires latent rep
+else: ## only other option is 'covar' for the Barlow Twins approach, but requires latent rep
     _,_,_,rep1,rep2 = model(torch.rand(tensor_shape, device='cuda')[:, :28, :, :, :], torch.rand(tensor_shape,device='cuda')[:, 28:, :, :, :])
     init_size = rep1.shape[-1]
     assert init_size == rep2.shape[-1]
@@ -415,11 +377,11 @@ if not args.no_wandb:
 # max_rot_weight = args.rotation_loss_weight
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
-tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep,1,proj=projector)
+tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, 1,proj=projector)
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}\n\tTest MAE:{tt_mae}')
 for epoch in range(1, epochs+1):
-    tr_loss, out_dist, tr_r, tr_rmse, tr_mae, tr_act = train(model, traine, optimizer, latent_rep, epoch, proj=projector)
-    tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep, epoch, proj=projector)
+    tr_loss, out_dist, tr_r, tr_rmse, tr_mae, tr_act = train(model, traine, optimizer, epoch, proj=projector)
+    tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, epoch, proj=projector)
 
     scheduler.step(tr_loss[0])
     
