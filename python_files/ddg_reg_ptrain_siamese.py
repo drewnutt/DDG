@@ -32,7 +32,8 @@ parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
 parser.add_argument('--solver', default="adam", choices=('adam','sgd','lars','sam'), type=str, help="solver to use")
-parser.add_argument('--swa', action='store_true', help="Use Stochastic Weight Averaging")
+parser.add_argument('--swa_lr', default=0.0,type=float, help="Use Stochastic Weight Averaging")
+parser.add_argument('--swa_start', default=500,type=float, help="Use Stochastic Weight Averaging")
 parser.add_argument('--epoch',default=200,type=int,help='number of epochs to train for (default %(default)d)')
 parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use batch normalization during the training process')
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
@@ -347,6 +348,10 @@ elif args.solver == 'sam':
     base_optim = optim.SGD
     optimizer = SAM(model.parameters(),base_optim, lr=args.lr,rho=args.rho,adaptive=args.adaptive_SAM)
 
+if args.swa_lr > 0:
+    swa_model = torch.optim.swa_utils.AveragedModel(model)
+    swa_scheduler = torch.optim.swa_utils.SWALR(optimizer, swa_lr=args.swa_lr)
+
 num_iters_pe = int(np.ceil(traine.small_epoch_size()/args.batch_size))
 if args.iter_scheme == 'large':
     num_iters_pe = int(np.floor(traine.large_epoch_size()/args.batch_size))
@@ -383,7 +388,11 @@ for epoch in range(1, epochs+1):
     tr_loss, out_dist, tr_r, tr_rmse, tr_mae, tr_act = train(model, traine, optimizer, epoch, proj=projector)
     tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, epoch, proj=projector)
 
-    scheduler.step(tr_loss[0])
+    if epoch > args.swa_start:
+        swa_model.update_parameters(model)
+        swa_scheduler.step()
+    else:
+        scheduler.step(tr_loss[0])
     
     if not np.isnan(np.min(out_dist[0])) and not args.no_wandb:
         wandb.log({"Output Distribution Train": wandb.Histogram(np.array(out_dist[0]))}, commit=False)
