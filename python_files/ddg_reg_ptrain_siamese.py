@@ -23,41 +23,43 @@ parser.add_argument('--trainfile', required=True, help='location of training inf
 parser.add_argument('--ligte', required=True, help='location of testing ligand cache file input')
 parser.add_argument('--recte', required=True, help='location of testing receptor cache file input')
 parser.add_argument('--testfile', required=True, help='location of testing information, this must have a group indicator')
+parser.add_argument('--stratify',default=False, action='store_true', help='use the column right before the receptor for stratification')
+parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the training example provider stratifying by the receptor')
+parser.add_argument('--no_rot_train',default=True,action='store_false',help='do not use random rotations during training')
+parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
+
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
-parser.add_argument('--non_lin',choices=['relu','leakyrelu'],default='relu',help='non-linearity to use in the network')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
 parser.add_argument('--solver', default="adam", choices=('adam','sgd','lars','sam'), type=str, help="solver to use")
 parser.add_argument('--epoch',default=200,type=int,help='number of epochs to train for (default %(default)d)')
-parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb run')
 parser.add_argument('--batch_norm',default=0,choices=[0,1],type=int,help='use batch normalization during the training process')
 parser.add_argument('--weight_decay',default=0,type=float,help='weight decay to use with the optimizer')
 parser.add_argument('--rho',default=0.05,type=float,help='rho to use with the Sharpness Aware Minimization (SAM) optimizer, size of the neighborhood')
 parser.add_argument('--adaptive_SAM',default=False,action='store_true',help='use Adaptive Sharpness Aware Minimization')
 parser.add_argument('--clip',default=0,type=float,help='keep gradients within [clip]')
 parser.add_argument('--binary_rep',default=False,action='store_true',help='use a binary representation of the atoms')
+
 parser.add_argument('--use_model','-m',default='paper',choices=['paper', 'latent_paper', 'def2018', 'extend_def2018', 'multtask_def2018','ext_mult_def2018', 'multtask_latent_def2018', 'multtask_latent_dense','multtask_latent_def2018_concat', 'multtask_latent_dense_concat','multtask_latent_equiv_def2018','multtask_latent_equiv2_def2018'], help='Network architecture to use')
 parser.add_argument('--use_weights','-w',help='pretrained weights to use for the model')
 parser.add_argument('--freeze_arms',choices=[0,1],default=0,type=int,help='freeze the weights of the CNN arms of the network (applies after using pretrained weights)')
 parser.add_argument('--hidden_size',default=1024,type=int,help='size of fully connected layer before subtraction in latent space')
 parser.add_argument('--batch_size',default=16,type=int,help='batch size (default: %(default)d)')
+
 parser.add_argument('--absolute_dg_loss', '-L',action='store_true',default=False,help='use a loss function (and model architecture) that utilizes the absolute binding affinity')
-parser.add_argument('--self_supervised_test', '-ST',action='store_true',default=False,help='Use the self supervised loss on the test files (no labels used)')
 parser.add_argument('--rotation_loss_weight','-R',default=1.0,type=float,help='weight to use in adding the rotation loss to the other losses (default: %(default)d)')
 parser.add_argument('--consistency_loss_weight','-C',default=1.0,type=float,help='weight to use in adding the consistency term to the other losses (default: %(default)d')
 parser.add_argument('--absolute_loss_weight','-A',default=1.0,type=float,help='weight to use in adding the absolute loss terms to the other losses (default: %(default)d')
 parser.add_argument('--ddg_loss_weight','-D',default=1.0,type=float,help='weight to use in adding the DDG loss terms to the other losses (default: %(default)d')
 parser.add_argument('--latent_loss',default='mse', choices=['mse','corr'],help='what type of loss to apply to the latent representations')
+parser.add_argument('--rot_warmup','-RW',default=0,type=int,help='how many epochs to warmup from 0 to your desired weight for rotation loss')
+
 parser.add_argument('--crosscorr_lambda', type=float, help='lambda value to use in the Cross Correlation Loss')
-parser.add_argument('--train_type',default='no_SS', choices=['no_SS','SS_simult_before','SS_simult_after'],help='what type of training loop to use') ## Delete this after running all addnl_ligs on 25
 parser.add_argument('--proj_size',type=int,default=4096,help='size to project the latent representation to, this is the dimension that the CrossCorrLoss will be applied to (default: %(default)d')
 parser.add_argument('--proj_layers',type=int,default=3,help='how many layers in the projection network, if 0 then there is no projection network(default: %(default)d')
-parser.add_argument('--rot_warmup','-RW',default=0,type=int,help='how many epochs to warmup from 0 to your desired weight for rotation loss')
-parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the training example provider stratifying by the receptor')
-parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
+
 parser.add_argument('--print_out','-P',default=False,action='store_true',help='print the labels and predictions during training')
-parser.add_argument('--no_rot_train',default=True,action='store_false',help='do not use random rotations during training')
-parser.add_argument('--stratify',default=False, action='store_true', help='use the column right before the receptor for stratification')
+parser.add_argument('--tags',default=[],nargs='*',help='tags to use for wandb run')
 parser.add_argument('--no_wandb',default=False, action='store_true', help='do not log run with wandb')
 args = parser.parse_args()
 
@@ -91,85 +93,6 @@ def weights_init(m):
         init.xavier_uniform_(m.weight.data)
         if m.bias is not None:
             init.constant_(m.bias.data, 0)
-
-class LARS(torch.optim.Optimizer):
-    def __init__(self, params, lr, weight_decay=0, momentum=0.9, eta=0.001,
-                 weight_decay_filter=None, lars_adaptation_filter=None):
-        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum,
-                        eta=eta, weight_decay_filter=weight_decay_filter,
-                        lars_adaptation_filter=lars_adaptation_filter)
-        super().__init__(params, defaults)
-
-    @torch.no_grad()
-    def step(self):
-        for g in self.param_groups:
-            for p in g['params']:
-                dp = p.grad
-
-                if dp is None:
-                    continue
-
-                if g['weight_decay_filter'] is None or not g['weight_decay_filter'](p):
-                    dp = dp.add(p, alpha=g['weight_decay'])
-
-                if g['lars_adaptation_filter'] is None or not g['lars_adaptation_filter'](p):
-                    param_norm = torch.norm(p)
-                    update_norm = torch.norm(dp)
-                    one = torch.ones_like(param_norm)
-                    q = torch.where(param_norm > 0.,
-                                    torch.where(update_norm > 0,
-                                                (g['eta'] * param_norm / update_norm), one), one)
-                    dp = dp.mul(q)
-
-                param_state = self.state[p]
-                if 'mu' not in param_state:
-                    param_state['mu'] = torch.zeros_like(p)
-                mu = param_state['mu']
-                mu.mul_(g['momentum']).add_(dp)
-
-                p.add_(mu, alpha=-g['lr'])
-
-class CrossCorrLoss(nn.Module):    
-    def __init__(self, rep_size, lambd, device='cpu'):    
-        super(CrossCorrLoss,self).__init__()    
-        self.bn = nn.BatchNorm1d(rep_size, affine=False).to(device)    
-        self.device = device
-        self.lambd = lambd    
-        
-    def forward(self, z1, z2):    
-        z1 = z1.to(self.device)
-        z2 = z2.to(self.device)
-        c = self.bn(z1).T @ self.bn(z2)    
-        on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()    
-            
-        n, m = c.shape    
-        assert n == m    
-        off_diagonals = c.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()    
-        off_diag = off_diagonals.pow_(2).sum()    
-           
-        loss = on_diag + self.lambd * off_diag    
-        return loss
-
-class Projector(nn.Module):
-    def __init__(self, rep_size, final_dim,layers=3):
-        super(Projector, self).__init__()
-        self.modules = []
-
-        first_layer = nn.Linear(rep_size,final_dim)
-        self.modules.append(first_layer)
-        self.add_module('first_proj',first_layer)
-        for idx in range(layers-1):
-            next_layer = nn.Linear(final_dim,final_dim)
-            self.modules.append(next_layer)
-            self.add_module(f'proj_{idx}',next_layer)
-
-    def forward(self, x):
-        x = self.modules[0](x)
-        for layer in self.modules[1:]:
-           x = F.relu(x) 
-           x = layer(x)
-        return x
-        
 
 def train(model, traine, optimizer, latent_rep, epoch, proj=None):
     model.train()
@@ -355,7 +278,6 @@ def make_tags(args):
     addnl_tags.append(args.use_model)
     if 'full_bdb' in args.ligtr:
         addnl_tags.append('full_BDB')
-    addnl_tags.append(args.train_type)
     addnl_tags.append(f'{args.latent_loss.title()}Loss')
     return addnl_tags
 
@@ -496,10 +418,6 @@ print('training now')
 tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep,1,proj=projector)
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}\n\tTest MAE:{tt_mae}')
 for epoch in range(1, epochs+1):
-    # if args.self_supervised_test:
-    #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
-    # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
-    # args.rotation_loss_weight = max_rot_weight * epoch/epochs
     tr_loss, out_dist, tr_r, tr_rmse, tr_mae, tr_act = train(model, traine, optimizer, latent_rep, epoch, proj=projector)
     tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep, epoch, proj=projector)
 
