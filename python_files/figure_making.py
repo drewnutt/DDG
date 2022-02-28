@@ -184,17 +184,18 @@ def get_eval_nosiam(args,model_file):
 def create_stats(pub_api,model_save_path,num_runs = 25,model="multtask_latent_def2018",
                  num_addnl=1,weight_decay=0,ddg_weight=10,consistency_weight=1,
                 absolute_weight=1,rotation_weight=1,use_weights=None,spec_name='',
-                 rot_warmup=0,state="finished",tag='MseLoss',):
-    runs = pub_api.runs(path='andmcnutt/DDG_model_Regression',
-                       filters={"$and":[{"config.use_model":model},
-                                        {'tags':f'addnl_ligs_{num_addnl}' if num_addnl else 'TrainAllPerms'},
-                                        {"config.rot_warmup":rot_warmup},{"config.weight_decay":weight_decay},
-                                        {"config.solver":"adam"},{"config.ddg_loss_weight":ddg_weight},
-                                        {"config.consistency_loss_weight":consistency_weight},
-                                        {"config.absolute_loss_weight":absolute_weight},
-                                        {"config.rotation_loss_weight":rotation_weight},
-                                        {"config.use_weights":use_weights},{"tags":tag},
-                                        {"state":state}]})
+                 rot_warmup=0,state="finished",tag='MseLoss',runs=None):
+    if runs is None:
+        runs = pub_api.runs(path='andmcnutt/DDG_model_Regression',
+                           filters={"$and":[{"config.use_model":model},
+                                            {'tags':f'addnl_ligs_{num_addnl}' if num_addnl else 'TrainAllPerms'},
+                                            {"config.rot_warmup":rot_warmup},{"config.weight_decay":weight_decay},
+                                            {"config.solver":"adam"},{"config.ddg_loss_weight":ddg_weight},
+                                            {"config.consistency_loss_weight":consistency_weight},
+                                            {"config.absolute_loss_weight":absolute_weight},
+                                            {"config.rotation_loss_weight":rotation_weight},
+                                            {"config.use_weights":use_weights},{"tags":tag},
+                                            {"state":state}]})
     assert len(runs) == num_runs, f"only have {len(runs)} runs"
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
