@@ -28,7 +28,7 @@ parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help
 parser.add_argument('--no_rot_train',default=True,action='store_false',help='do not use random rotations during training')
 parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
 
-parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
+parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
 parser.add_argument('--dropout', '-d',default=0, type=float,help='dropout of layers')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum of optimizer')
 parser.add_argument('--solver', default="adam", choices=('adam','sgd','lars','sam'), type=str, help="solver to use")
@@ -86,7 +86,7 @@ def weights_init(m):
         if m.bias is not None:
             init.constant_(m.bias.data, 0)
 
-def loss_func(predictions, labels):
+def loss_func(predictions, labels,idx):
     output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2) = predictions
     labels,lig1_labels,lig2_labels = labels
     rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
@@ -96,7 +96,7 @@ def loss_func(predictions, labels):
     ddg_loss = criterion(output, labels)
     full_loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + \
             args.ddg_loss_weight * ddg_loss + \
-            args.rotation_loss_weight[it] * rotation_loss + \
+            args.rotation_loss_weight[idx] * rotation_loss + \
             args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
 
     return full_loss, (rotation_loss.item(), (loss_lig1+loss_lig2).item(), ddg_loss.item())
@@ -109,6 +109,17 @@ def train(model, traine, optimizer, epoch, proj=None):
     lig_pred, lig_labels = [], []
     for idx, batch in enumerate(traine):
         it = num_iters_pe * epoch + idx
+        def closure():
+            output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
+            _, _, _, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
+            if proj:
+                lig1_rep1 = proj(lig1_rep1)
+                lig1_rep2 = proj(lig1_rep2)
+                lig2_rep1 = proj(lig2_rep1)
+                lig2_rep2 = proj(lig2_rep2)
+            loss, _ = loss_func((output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2)),(labels,lig1_labels,lig2_labels),it)
+            loss.backward()
+            return loss
         gmaker.forward(batch, input_tensor_1, random_translation=2.0, random_rotation=args.no_rot_train) 
         gmaker.forward(batch, input_tensor_2, random_translation=2.0, random_rotation=True) 
         batch.extract_label(1, float_labels)
@@ -125,7 +136,7 @@ def train(model, traine, optimizer, epoch, proj=None):
             lig1_rep2 = proj(lig1_rep2)
             lig2_rep1 = proj(lig2_rep1)
             lig2_rep2 = proj(lig2_rep2)
-        loss, (rotation_loss, dg_loss, ddg_loss) = loss_func((output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2)),(labels,lig1_labels,lig2_labels))
+        loss, (rotation_loss, dg_loss, ddg_loss) = loss_func((output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2)),(labels,lig1_labels,lig2_labels),it)
         lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
         lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
         lig_loss += dg_loss
@@ -135,7 +146,10 @@ def train(model, traine, optimizer, epoch, proj=None):
         loss.backward()
         if args.clip > 0:
             nn.utils.clip_grad_norm_(model.parameters(),args.clip)
-        optimizer.step()
+        optim_closure = None
+        if args.solver == 'sam':
+            optim_closure = closure
+        optimizer.step(optim_closure)
         output_dist += output.flatten().tolist()
         actual += labels.flatten().tolist()
         if args.print_out:
@@ -199,7 +213,7 @@ def test(model, test_data, epoch, proj=None):
                 lig1_rep2 = proj(lig1_rep2)
                 lig2_rep1 = proj(lig2_rep1)
                 lig2_rep2 = proj(lig2_rep2)
-            loss, (rotation_loss, dg_loss, ddg_loss) = loss_func((output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2)),(labels,lig1_labels,lig2_labels))
+            loss, (rotation_loss, dg_loss, ddg_loss) = loss_func((output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2)),(labels,lig1_labels,lig2_labels),it)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
             lig_loss += dg_loss
@@ -281,11 +295,11 @@ tensor_shape = (batch_size,)+dims
 
 actual_dims = (dims[0]//2, *dims[1:])
 model = Net(actual_dims,args)
-if torch.cuda.device_count() > 1:
-        print("Using {} GPUs".format(torch.cuda.device_count()))
-        model = nn.DataParallel(model)
-else:
-        print('GPUS: {}'.format(torch.cuda.device_count()), flush=True)
+# if torch.cuda.device_count() > 1:
+#         print("Using {} GPUs".format(torch.cuda.device_count()))
+#         model = nn.DataParallel(model)
+# else:
+#         print('GPUS: {}'.format(torch.cuda.device_count()), flush=True)
 model.to('cuda')
 print('done moving model')
 model.apply(weights_init)
@@ -340,18 +354,16 @@ params = [param for param in model.parameters()]
 if projector:
     print("Adding projector to optimizer parameters")
     params += [param for param in projector.parameters()]
-closure = None
 optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.weight_decay)
 if args.solver == "sgd":
     optimizer = optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 elif args.solver == 'lars':
     optimizer = LARS(params, lr=args.lr,momentum=args.momentum,weight_decay=args.weight_decay)
 elif args.solver == 'sam':
-    raise NotImplementedError("Need to refactor code for SAM")
     assert (projector is None), "SAM does not work with more than one model parameters"
     from sam import SAM
     base_optim = optim.SGD
-    optimizer = SAM(model.parameters(),base_optim, lr=args.lr,rho=args.rho,adaptive=args.adaptive_SAM)
+    optimizer = SAM(model.parameters(),base_optim, lr=args.lr,rho=args.rho,adaptive=args.adaptive_SAM, momentum=args.momentum, weight_decay=args.weight_decay)
 
 if args.swa_lr > 0:
     swa_model = torch.optim.swa_utils.AveragedModel(model)
@@ -387,8 +399,8 @@ if not args.no_wandb:
 # max_rot_weight = args.rotation_loss_weight
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
-tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, 1,proj=projector)
-print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}\n\tTest MAE:{tt_mae}')
+# tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, 1,proj=projector)
+# print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}\n\tTest MAE:{tt_mae}')
 for epoch in range(1, epochs+1):
     tr_loss, out_dist, tr_r, tr_rmse, tr_mae, tr_act = train(model, traine, optimizer, epoch, proj=projector)
     tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, epoch, proj=projector)
