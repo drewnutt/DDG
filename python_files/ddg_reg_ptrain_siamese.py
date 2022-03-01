@@ -86,6 +86,19 @@ def weights_init(m):
         if m.bias is not None:
             init.constant_(m.bias.data, 0)
 
+def loss_func(predictions, labels):
+    rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
+    rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
+    loss_lig1 = criterion_lig1(lig1, lig1_labels)
+    loss_lig2 = criterion_lig2(lig2, lig2_labels)
+    ddg_loss = criterion(output, labels)
+    full_loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + \
+            args.ddg_loss_weight * ddg_loss + \
+            args.rotation_loss_weight[it] * rotation_loss + \
+            args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
+
+    return full_loss, (rotation_loss.item(), (loss_lig1+loss_lig2).item(), ddg_loss.item())
+
 def train(model, traine, optimizer, epoch, proj=None):
     model.train()
     full_loss, lig_loss, rot_loss, DDG_loss = 0, 0, 0, 0
@@ -104,24 +117,19 @@ def train(model, traine, optimizer, epoch, proj=None):
         lig1_labels = torch.unsqueeze(lig1_label, 1).float().to('cuda')
         lig2_labels = torch.unsqueeze(lig2_label, 1).float().to('cuda')
         output, lig1, lig2, lig1_rep1, lig2_rep1 = model(input_tensor_1[:, :28, :, :, :], input_tensor_1[:, 28:, :, :, :])
-        output2, lig1_2, lig2_2, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
+        _, _, _, lig1_rep2, lig2_rep2 = model(input_tensor_2[:, :28, :, :, :], input_tensor_2[:, 28:, :, :, :])
         if proj:
             lig1_rep1 = proj(lig1_rep1)
             lig1_rep2 = proj(lig1_rep2)
             lig2_rep1 = proj(lig2_rep1)
             lig2_rep2 = proj(lig2_rep2)
-        rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
-        rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
-        loss_lig1 = criterion_lig1(lig1, lig1_labels)
-        loss_lig2 = criterion_lig2(lig2, lig2_labels)
-        ddg_loss = criterion(output, labels)
-        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight[it] * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
+        loss, (rotation_loss, dg_loss, ddg_loss) = loss_func((output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2)),(labels,lig1_labels,lig2_labels))
         lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
         lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
-        lig_loss += loss_lig1 + loss_lig2
+        lig_loss += dg_loss
         rot_loss += rotation_loss
         DDG_loss += ddg_loss
-        full_loss += loss
+        full_loss += loss.item()
         loss.backward()
         if args.clip > 0:
             nn.utils.clip_grad_norm_(model.parameters(),args.clip)
@@ -189,18 +197,13 @@ def test(model, test_data, epoch, proj=None):
                 lig1_rep2 = proj(lig1_rep2)
                 lig2_rep1 = proj(lig2_rep1)
                 lig2_rep2 = proj(lig2_rep2)
-            rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
-            rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
-            loss_lig1 = criterion_lig1(lig1, lig1_labels)
-            loss_lig2 = criterion_lig2(lig2, lig2_labels)
-            ddg_loss = criterion(output, labels)
-            loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight[it] * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
+            loss, (rotation_loss, dg_loss, ddg_loss) = loss_func((output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2)),(labels,lig1_labels,lig2_labels))
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
-            lig_loss += loss_lig1 + loss_lig2
+            lig_loss += dg_loss
             rot_loss += rotation_loss
             DDG_loss += ddg_loss
-            test_loss += loss
+            test_loss += loss.item()
             output_dist += output.flatten().tolist()
             actual += labels.flatten().tolist()
             if args.print_out:
