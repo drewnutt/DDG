@@ -87,6 +87,8 @@ def weights_init(m):
             init.constant_(m.bias.data, 0)
 
 def loss_func(predictions, labels):
+    output, lig1, lig2, (lig1_rep1,lig1_rep2), (lig2_rep1,lig2_rep2) = predictions
+    labels,lig1_labels,lig2_labels = labels
     rotation_loss = dgrotloss1(lig1_rep1, lig1_rep2)
     rotation_loss += dgrotloss2(lig2_rep1, lig2_rep2)
     loss_lig1 = criterion_lig1(lig1, lig1_labels)
