@@ -20,6 +20,9 @@ slurm-*.out
 *.synctex.gz
 *.h5
 
+#Gnina comparisons
+GNINA_RUN/*
+
 #external test sets
 external_test/*/*DDG_?TT.types
 

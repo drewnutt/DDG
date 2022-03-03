@@ -1,5 +1,0 @@
-general_default2018:
-Metric | Accuracy
------|-----
-GNINA Affinity | 0.5871893602425369
-GNINA Score | 0.5368895085087079
