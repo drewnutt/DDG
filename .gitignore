@@ -2,7 +2,6 @@
 wandb/**
 cache/**
 separated_sets/**
-!separated_sets/*
 separated_sets/.*
 *.swp
 python_files/__pycache__/*
