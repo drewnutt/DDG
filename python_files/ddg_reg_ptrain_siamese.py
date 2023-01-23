@@ -52,7 +52,6 @@ parser.add_argument('--crosscorr_lambda', type=float, help='lambda value to use 
 parser.add_argument('--train_type',default='no_SS', choices=['no_SS','SS_simult_before','SS_simult_after'],help='what type of training loop to use') ## Delete this after running all addnl_ligs on 25
 parser.add_argument('--proj_size',type=int,default=4096,help='size to project the latent representation to, this is the dimension that the CrossCorrLoss will be applied to (default: %(default)d')
 parser.add_argument('--proj_layers',type=int,default=3,help='how many layers in the projection network, if 0 then there is no projection network(default: %(default)d')
-parser.add_argument('--rot_warmup','-RW',default=0,type=int,help='how many epochs to warmup from 0 to your desired weight for rotation loss')
 parser.add_argument('--stratify_rec','-S',default=False,action='store_true',help='toggle the training example provider stratifying by the receptor')
 parser.add_argument('--iter_scheme','-I',choices=['small','large'],default='small',help='what sort of epoch iteration scheme to use')
 parser.add_argument('--print_out','-P',default=False,action='store_true',help='print the labels and predictions during training')
@@ -213,7 +212,7 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
         loss_lig1 = criterion_lig1(lig1, lig1_labels)
         loss_lig2 = criterion_lig2(lig2, lig2_labels)
         ddg_loss = criterion(output, labels)
-        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight[it] * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
+        loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2), output)
         lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
         lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
         lig_loss += loss_lig1 + loss_lig2
@@ -231,7 +230,7 @@ def train(model, traine, optimizer, latent_rep, epoch, proj=None):
             for example in range(len(labels)):
                 print(f"{labels[example].item():.3f} {output[example].item():.3f} {lig1_labels[example].item():.3f} {lig1[example].item():.3f} {lig2_labels[example].item():.3f} {lig2[example].item():.3f}")
 
-    print(f'{epoch}: {args.rotation_loss_weight[it]}')
+    # print(f'{epoch}: {args.rotation_loss_weight[it]}')
 
     total_samples = (idx + 1) * len(batch)
     try:
@@ -304,7 +303,7 @@ def test(model, test_data, latent_rep, epoch, proj=None):
             loss_lig1 = criterion_lig1(lig1, lig1_labels)
             loss_lig2 = criterion_lig2(lig2, lig2_labels)
             ddg_loss = criterion(output, labels)
-            loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight[it] * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
+            loss = args.absolute_loss_weight * (loss_lig1 + loss_lig2) + args.ddg_loss_weight * ddg_loss + args.rotation_loss_weight * rotation_loss + args.consistency_loss_weight * nn.functional.mse_loss((lig1-lig2),output)
             lig_pred += lig1.flatten().tolist() + lig2.flatten().tolist()
             lig_labels += lig1_labels.flatten().tolist() + lig2_labels.flatten().tolist()
             lig_loss += loss_lig1 + loss_lig2
@@ -466,17 +465,6 @@ elif args.solver == 'sam':
 num_iters_pe = int(np.ceil(traine.small_epoch_size()/args.batch_size))
 if args.iter_scheme == 'large':
     num_iters_pe = int(np.floor(traine.large_epoch_size()/args.batch_size))
-if args.rot_warmup:
-    init_iters = num_iters_pe * (10)
-    before_warmup = np.full((init_iters,),0)
-    num_iters = num_iters_pe * args.rot_warmup
-    warmup_schedule = np.linspace(0,args.rotation_loss_weight,int(num_iters) )
-    final_iters = num_iters_pe * (args.epoch)
-    args.rotation_loss_weight = np.concatenate((before_warmup,warmup_schedule,np.full((final_iters,),args.rotation_loss_weight)))
-else:
-    all_iters = num_iters_pe * (args.epoch) * 2
-    args.rotation_loss_weight = np.full((all_iters,),args.rotation_loss_weight)
-
 
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.7, threshold=0.001, patience=20, verbose=True)
@@ -490,16 +478,11 @@ lig2_label = torch.zeros(batch_size, dtype=torch.float32)
 
 if not args.no_wandb:
     wandb.watch(model, log='all')
-# max_rot_weight = args.rotation_loss_weight
 print('training now')
 ## I want to see how the model is doing on the test before even training, mostly for the pretrained models
 tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep,1,proj=projector)
 print(f'Before Training at all:\n\tTest Loss: {tt_loss}\n\tTest R:{tt_r}\n\tTest RMSE:{tt_rmse}\n\tTest MAE:{tt_mae}')
 for epoch in range(1, epochs+1):
-    # if args.self_supervised_test:
-    #     ss_loss = train_rotation(model, teste, optimizer, latent_rep)
-    # tr_loss, out_dist, tr_r, tr_rmse, tr_act = train(model, traine, optimizer, latent_rep)
-    # args.rotation_loss_weight = max_rot_weight * epoch/epochs
     tr_loss, out_dist, tr_r, tr_rmse, tr_mae, tr_act = train(model, traine, optimizer, latent_rep, epoch, proj=projector)
     tt_loss, out_d, tt_r, tt_rmse, tt_mae, tt_act = test(model, teste, latent_rep, epoch, proj=projector)
 

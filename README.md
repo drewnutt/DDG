@@ -1,5 +1,5 @@
 # Models and Data for prediction of &Delta;&Delta;G
-All of the models and data utilized for the experiments carried out in [Improving ΔΔG predictions with a multi-task convolutional Siamese Network](https://doi.org/10.26434/chemrxiv-2021-vcmzz).
+All of the models and data utilized for the experiments carried out in [Improving ΔΔG predictions with a multi-task convolutional Siamese Network](https://doi.org/10.1021/acs.jcim.1c01497).
 
 Data can be found in `BindingDB_data`
 
