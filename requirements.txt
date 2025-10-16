@@ -1,0 +1,12 @@
+# Core dependencies for DDG training
+torch>=1.10.0,<2.6.0
+numpy>=1.20.0,<2.0.0
+scipy>=1.7.0
+matplotlib>=3.3.0
+plotly>5.0.0
+
+# Molecular modeling
+molgrid>=0.5.3
+
+# Experiment tracking
+wandb>=0.12.0,<=0.18.7
